@@ -82,6 +82,10 @@ io.on('connection', (socket: Socket) => {
         console.log(`User disconnected: ${socket.id}`);
     });
 
+    socket.on('client-log', (data: { level: string, message: string, timestamp: string }) => {
+        console.log(`[MOBILE-${data.level.toUpperCase()}] ${socket.id}: ${data.message}`);
+    });
+
     socket.on('disconnecting', () => {
         for (const roomId of socket.rooms) {
             const room = rooms.get(roomId);
