@@ -64,7 +64,11 @@ const MonitorScreen = ({ navigation }: any) => {
 
     const connectSignaling = () => {
         AzureLogger.log('Initiating Signaling Connection', { mode: 'monitor' });
-        socketRef.current = io(CONFIG.SIGNALING_SERVER);
+        // Force Websocket transport to avoid long-polling issues on Android/Azure
+        socketRef.current = io(CONFIG.SIGNALING_SERVER, {
+            transports: ['websocket'],
+            path: '/socket.io'
+        });
 
         socketRef.current.on('connect', () => {
             AzureLogger.log('Socket Connected to Backend', { mode: 'monitor', socketId: socketRef.current?.id });
