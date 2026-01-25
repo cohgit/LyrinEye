@@ -1,41 +1,33 @@
-# LyrinEye - Zero-Cost Security Camera
+# LyrinEye - Zero-Cost Security Camera System
 
-LyrinEye transforms your spare Android devices into a smart security camera system with zero operational costs using cloud free tiers.
+LyrinEye is a mobile-first security solution designed to leverage cloud "forever-free" or low-cost tiers. It transforms Android devices into smart cameras with remote monitoring and historical playback.
 
-## Architecture
+## 🚀 Project Specifications
 
-- **Backend:** Azure Container Apps (Consumption Plan).
-- **Metadata Storage:** Azure Table Storage (No-SQL, Low Cost).
-- **Video Storage:** Azure Blob Storage.
-- **CI/CD:** GitHub Actions with OIDC for secure deployment.
-- **State Management:** Terraform Cloud.
+- **Architecture Strategy:** Zero-Cost infrastructure using Azure.
+- **Compute:** Azure Container Apps (Consumption Plan) with scaling to zero.
+- **Data Storage (V1):** No traditional Database. Uses **Azure Table Storage** for metadata and **Azure Blob Storage** for video clips.
+- **Distribution:** Mobile Android APK generated via CI/CD and distributed through **GitHub Releases**.
+- **CI/CD:** GitHub Actions with **OIDC Authentication** (Zero-Secret strategy for Azure credentials).
+- **State Management:** Terraform Cloud (Organization: `cogalde`).
 
-## Project Structure
+## 🛠 Tech Stack
+- **Infrastructure:** Terraform (Azure Provider).
+- **Backend:** Node.js/Go (to be defined) in Container Apps.
+- **Mobile:** Android (Kotlin/Native or React Native - TBD).
 
-- `/infrastructure`: Terraform manifests for cloud resources.
-- `.github/workflows`: CI/CD pipelines.
+## 🔒 Security & Public Repository Guidelines
 
-## Getting Started
+> [!IMPORTANT]
+> This is a **Public Repository**. 
 
-### Prerequisites
-1. **Azure Subscription:** Ensure you have an active subscription.
-2. **Terraform Cloud Account:** Create an organization and token.
-3. **GitHub Secrets:** Configure the following secrets in your repository:
-   - `AZURE_CLIENT_ID`: Application (client) ID for OIDC.
-   - `AZURE_TENANT_ID`: Directory (tenant) ID.
-   - `AZURE_SUBSCRIPTION_ID`: Your Azure Subscription ID.
-   - `TF_API_TOKEN`: Your Terraform Cloud API token.
+- **No Secrets in Code:** All sensitive values (IDs, tokens, connection strings) MUST be handled via GitHub Secrets or environment variables.
+- **Identity:** Use OIDC for Azure authentication to avoid storing Service Principal keys.
+- **State:** Terraform state is stored securely in Terraform Cloud.
 
-### Initial Setup
-1. Update `infrastructure/main.tf` with your Terraform Cloud organization name.
-2. Run `terraform init` locally to verify connectivity.
-3. Push to `main` to trigger the first deployment.
+## 📁 Repository Structure
+- `/infrastructure`: Terraform manifests for Azure resources.
+- `.github/workflows`: Deployment and build pipelines.
 
-## Mobile App (APK)
-The APK is built via GitHub Actions and available in the **Releases** section of this repository.
-
-### Monitor Mode
-Activate this on the device you want to use as a camera. It will stream live video via WebRTC.
-
-### Viewer Mode
-Use this to see your cameras and browse historical clips stored in Azure.
+## 🚦 Getting Started
+Follow the [Deployment Walkthrough](.gemini/antigravity/brain/walkthrough.md) to set up your environment, Azure Federated Credentials, and GitHub Secrets.
