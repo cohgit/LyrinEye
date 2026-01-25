@@ -72,7 +72,7 @@ const ViewerScreen = ({ navigation }: any) => {
         };
 
         // Fallback for older WebRTC versions
-        pc.onaddstream = (event: any) => {
+        (pc as any).onaddstream = (event: any) => {
             setRemoteStream(event.stream);
             setStatus('LIVE');
         };

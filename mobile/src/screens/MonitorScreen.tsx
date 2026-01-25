@@ -46,11 +46,9 @@ const MonitorScreen = ({ navigation }: any) => {
             const stream = await mediaDevices.getUserMedia({
                 audio: true,
                 video: {
-                    mandatory: {
-                        minWidth: 640,
-                        minHeight: 480,
-                        minFrameRate: 30,
-                    },
+                    width: 640,
+                    height: 480,
+                    frameRate: 30,
                     facingMode: 'environment', // Use back camera for monitor
                 }
             });
@@ -94,7 +92,7 @@ const MonitorScreen = ({ navigation }: any) => {
             pc.addTrack(track, localStream.current);
         });
 
-        pc.onicecandidate = (event) => {
+        (pc as any).onicecandidate = (event: any) => {
             if (event.candidate) {
                 socketRef.current?.emit('ice-candidate', { roomId: 'default-room', candidate: event.candidate, to: viewerId });
             }
