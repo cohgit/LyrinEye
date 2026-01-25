@@ -16,6 +16,22 @@ class AzureLoggerService {
         DeviceInfo.getDeviceName().then(name => this.deviceName = name);
     }
 
+    async getSystemMetrics() {
+        try {
+            const batteryLevel = await DeviceInfo.getBatteryLevel();
+            const freeDisk = await DeviceInfo.getFreeDiskStorage();
+            const totalMemory = await DeviceInfo.getTotalMemory();
+
+            return {
+                BatteryLevel: (batteryLevel * 100).toFixed(1) + '%',
+                FreeDisk: (freeDisk / 1024 / 1024 / 1024).toFixed(2) + ' GB',
+                TotalMemory: (totalMemory / 1024 / 1024 / 1024).toFixed(2) + ' GB'
+            };
+        } catch (e) {
+            return { error: 'Failed to retrieve metrics' };
+        }
+    }
+
     async log(message: string, context: Record<string, any> = {}, level: 'INFO' | 'ERROR' | 'WARN' = 'INFO') {
         try {
             const netState = await NetInfo.fetch();
