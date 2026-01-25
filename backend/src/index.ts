@@ -45,14 +45,21 @@ io.on('connection', (socket: Socket) => {
             // If monitor is already there, notify the new viewer
             if (room.monitor) {
                 socket.emit('monitor-online');
+                // Notify the monitor that a new viewer joined
+                io.to(room.monitor).emit('viewer-joined', socket.id);
             }
         }
     });
 
     // WebRTC Signaling: Offer
-    socket.on('offer', (data: { roomId: string, offer: any }) => {
-        console.log(`Relaying offer from ${socket.id} in room ${data.roomId}`);
-        socket.to(data.roomId).emit('offer', { from: socket.id, offer: data.offer });
+    socket.on('offer', (data: { roomId: string, offer: any, to?: string }) => {
+        if (data.to) {
+            console.log(`Relaying offer from ${socket.id} directly to ${data.to}`);
+            io.to(data.to).emit('offer', { from: socket.id, offer: data.offer });
+        } else {
+            console.log(`Relaying offer from ${socket.id} in room ${data.roomId}`);
+            socket.to(data.roomId).emit('offer', { from: socket.id, offer: data.offer });
+        }
     });
 
     // WebRTC Signaling: Answer
