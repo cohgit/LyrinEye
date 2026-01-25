@@ -59,13 +59,14 @@ jobs:
         
         echo "New version: $NEW_TAG"
         echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+        echo "new_version=$MAJOR.$MINOR.$NEW_PATCH" >> $GITHUB_OUTPUT
 
     - name: Install Dependencies
       working-directory: ./mobile
       run: npm ci
 
     - name: Build Android Release
-      run: ./gradlew assembleRelease
+      run: ./gradlew assembleRelease -PversionName=${{ steps.version.outputs.new_version }} -PversionCode=${{ github.run_number }}
 
     - name: Rename APK
       run: |
