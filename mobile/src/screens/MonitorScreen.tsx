@@ -1,23 +1,76 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Linking } from 'react-native';
+import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 
 const MonitorScreen = ({ navigation }: any) => {
+    const device = useCameraDevice('back');
+    const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
+    const { hasPermission: hasMicrophonePermission, requestPermission: requestMicrophonePermission } = useMicrophonePermission();
+
+    const [isStreaming, setIsStreaming] = useState(false);
+
+    useEffect(() => {
+        const checkPermissions = async () => {
+            if (!hasCameraPermission) {
+                await requestCameraPermission();
+            }
+            if (!hasMicrophonePermission) {
+                await requestMicrophonePermission();
+            }
+        };
+        checkPermissions();
+    }, [hasCameraPermission, hasMicrophonePermission, requestCameraPermission, requestMicrophonePermission]);
+
+    if (!hasCameraPermission) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.centered}>
+                    <Text style={styles.errorText}>No Camera Permission</Text>
+                    <TouchableOpacity style={styles.settingsButton} onPress={() => Linking.openSettings()}>
+                        <Text style={styles.settingsButtonText}>Grant Permission in Settings</Text>
+                    </TouchableOpacity>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (device == null) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.centered}>
+                    <ActivityIndicator size="large" color="#0EA5E9" />
+                    <Text style={styles.placeholderText}>Initializing Camera...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.previewContainer}>
-                <View style={styles.cameraPlaceholder}>
-                    <Text style={styles.placeholderText}>Camera Feed Preview</Text>
-                    <View style={styles.recordingDot} />
+                <Camera
+                    style={StyleSheet.absoluteFill}
+                    device={device}
+                    isActive={true}
+                    video={true}
+                    audio={hasMicrophonePermission}
+                />
+                <View style={styles.overlay}>
+                    {isStreaming && <View style={styles.recordingDot} />}
+                    <Text style={styles.liveIndicator}>{isStreaming ? 'LIVE' : 'PREVIEW'}</Text>
                 </View>
             </View>
 
             <View style={styles.controls}>
                 <View style={styles.statusBadge}>
-                    <Text style={styles.statusText}>STATUS: READY</Text>
+                    <Text style={styles.statusText}>STATUS: {isStreaming ? 'STREAMING' : 'READY'}</Text>
                 </View>
 
-                <TouchableOpacity style={styles.startButton}>
-                    <Text style={styles.startButtonText}>START STREAMING</Text>
+                <TouchableOpacity
+                    style={[styles.startButton, isStreaming && styles.stopButton]}
+                    onPress={() => setIsStreaming(!isStreaming)}
+                >
+                    <Text style={styles.startButtonText}>{isStreaming ? 'STOP STREAMING' : 'START STREAMING'}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -38,25 +91,45 @@ const styles = StyleSheet.create({
     },
     previewContainer: {
         flex: 3,
-        justifyContent: 'center',
-        alignItems: 'center',
+        backgroundColor: '#000',
     },
-    cameraPlaceholder: {
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#1E293B',
+    centered: {
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        padding: 32,
+    },
+    overlay: {
+        ...StyleSheet.absoluteFillObject,
+        padding: 32,
+        justifyContent: 'flex-start',
+        alignItems: 'flex-end',
     },
     placeholderText: {
         color: '#94A3B8',
         fontSize: 18,
-        fontStyle: 'italic',
+        marginTop: 16,
+    },
+    errorText: {
+        color: '#EF4444',
+        fontSize: 20,
+        fontWeight: '700',
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    liveIndicator: {
+        color: '#FFF',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 4,
+        fontWeight: '800',
+        overflow: 'hidden',
     },
     recordingDot: {
         position: 'absolute',
-        top: 40,
-        right: 40,
+        top: 32,
+        left: 32,
         width: 20,
         height: 20,
         borderRadius: 10,
@@ -91,6 +164,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 16,
     },
+    stopButton: {
+        backgroundColor: '#EF4444',
+    },
     startButtonText: {
         color: '#FFF',
         fontSize: 18,
@@ -102,6 +178,16 @@ const styles = StyleSheet.create({
     backButtonText: {
         color: '#64748B',
         fontSize: 16,
+    },
+    settingsButton: {
+        backgroundColor: '#1E293B',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 12,
+    },
+    settingsButtonText: {
+        color: '#F8FAFC',
+        fontWeight: '600',
     },
 });
 
