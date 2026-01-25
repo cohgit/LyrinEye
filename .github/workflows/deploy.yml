@@ -3,8 +3,16 @@ name: 'Infrastructure Deploy'
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'infrastructure/**'
   pull_request:
+    paths:
+      - 'infrastructure/**'
   workflow_dispatch:
+
+concurrency:
+  group: terraform
+  cancel-in-progress: false
 
 permissions:
   id-token: write # Required for OIDC
