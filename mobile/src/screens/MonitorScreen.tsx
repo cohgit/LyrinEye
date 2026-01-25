@@ -1,12 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Linking, Alert } from 'react-native';
-import { useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera'; // Oops, we removed this package. Need verify permissions logic.
-// Actually, react-native-webrtc handles permissions gracefully or we need another permission lib.
-// For now, let's assume permissions are handled or use simple check.
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
 import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, mediaDevices, RTCView } from 'react-native-webrtc';
 import { io, Socket } from 'socket.io-client';
-import ReactNativeBlobUtil from 'react-native-blob-util';
 import { CONFIG } from '../config';
+import { AzureLogger } from '../utils/AzureLogger';
 
 const configuration = {
     iceServers: [
@@ -19,11 +16,10 @@ const MonitorScreen = ({ navigation }: any) => {
     const [isStreaming, setIsStreaming] = useState(false);
     const socketRef = useRef<Socket | null>(null);
     const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
-    const localStream = useRef<any>(null); // MediaStream
+    const localStream = useRef<any>(null);
     const [localStreamUrl, setLocalStreamUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        // Init stream for preview
         startCamera();
         return () => stopCamera();
     }, []);
@@ -38,6 +34,7 @@ const MonitorScreen = ({ navigation }: any) => {
 
     const startCamera = async () => {
         try {
+            AzureLogger.log('Starting Camera', { mode: 'monitor' });
             const stream = await mediaDevices.getUserMedia({
                 audio: true,
                 video: {
@@ -49,7 +46,9 @@ const MonitorScreen = ({ navigation }: any) => {
             });
             localStream.current = stream;
             setLocalStreamUrl(stream.toURL());
+            AzureLogger.log('Camera Started Successfully', { mode: 'monitor' });
         } catch (error) {
+            AzureLogger.log('Camera Failed to Start', { mode: 'monitor', error: String(error) }, 'ERROR');
             console.error('Failed to start camera:', error);
             Alert.alert('Error', 'Failed to access camera');
         }
@@ -64,17 +63,25 @@ const MonitorScreen = ({ navigation }: any) => {
     };
 
     const connectSignaling = () => {
+        AzureLogger.log('Initiating Signaling Connection', { mode: 'monitor' });
         socketRef.current = io(CONFIG.SIGNALING_SERVER);
 
         socketRef.current.on('connect', () => {
+            AzureLogger.log('Socket Connected to Backend', { mode: 'monitor', socketId: socketRef.current?.id });
             socketRef.current?.emit('join-room', 'default-room', 'monitor');
         });
 
+        socketRef.current.on('connect_error', (err) => {
+            AzureLogger.log('Socket Connection Error', { mode: 'monitor', error: String(err) }, 'ERROR');
+        });
+
         socketRef.current.on('viewer-joined', async (viewerId: string) => {
+            AzureLogger.log('Viewer Joined', { mode: 'monitor', viewerId });
             await initiateConnection(viewerId);
         });
 
         socketRef.current.on('answer', async ({ from, answer }: any) => {
+            AzureLogger.log('Received Answer', { mode: 'monitor', from });
             const pc = peerConnections.current.get(from);
             if (pc) {
                 await pc.setRemoteDescription(new RTCSessionDescription(answer));
@@ -82,6 +89,8 @@ const MonitorScreen = ({ navigation }: any) => {
         });
 
         socketRef.current.on('ice-candidate', async ({ from, candidate }: any) => {
+            // Verbose log for ICE candidates might be too much, keeping it light or specific level
+            // AzureLogger.log('Received ICE Candidate', { mode: 'monitor', from });
             const pc = peerConnections.current.get(from);
             if (pc) {
                 await pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -90,14 +99,19 @@ const MonitorScreen = ({ navigation }: any) => {
     };
 
     const disconnectSignaling = () => {
+        AzureLogger.log('Disconnecting Signaling', { mode: 'monitor' });
         socketRef.current?.disconnect();
         peerConnections.current.forEach(pc => pc.close());
         peerConnections.current.clear();
     };
 
     const initiateConnection = async (viewerId: string) => {
-        if (!localStream.current) return;
+        if (!localStream.current) {
+            AzureLogger.log('Cannot initiate connection: No local stream', { mode: 'monitor' }, 'WARN');
+            return;
+        }
 
+        AzureLogger.log('Initiating WebRTC Connection', { mode: 'monitor', viewerId });
         const pc = new RTCPeerConnection(configuration);
         peerConnections.current.set(viewerId, pc);
 
@@ -114,6 +128,7 @@ const MonitorScreen = ({ navigation }: any) => {
         const offer = await pc.createOffer({});
         await pc.setLocalDescription(offer);
         socketRef.current?.emit('offer', { roomId: 'default-room', offer, to: viewerId });
+        AzureLogger.log('Offer Sent', { mode: 'monitor', viewerId });
     };
 
     return (
