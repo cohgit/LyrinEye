@@ -2,16 +2,18 @@ name: 'Mobile Release'
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'mobile/**'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  android-build:
-    name: Android Build
+  build-and-release:
+    name: Build & Release
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -20,6 +22,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0 # Required to fetch tags
 
     - name: Setup Java
       uses: actions/setup-java@v4
@@ -34,6 +38,28 @@ jobs:
         cache: 'npm'
         cache-dependency-path: mobile/package-lock.json
 
+    - name: Calculate Next Version
+      id: version
+      working-directory: .
+      run: |
+        # Get the latest tag, default to v0.1.0 if none exists
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.1.0")
+        echo "Latest tag: $LATEST_TAG"
+        
+        # Split version into array (assuming vX.Y.Z format)
+        IFS='.' read -r -a VERSION_PARTS <<< "${LATEST_TAG#v}"
+        
+        MAJOR=${VERSION_PARTS[0]}
+        MINOR=${VERSION_PARTS[1]}
+        PATCH=${VERSION_PARTS[2]}
+        
+        # Increment PATCH version
+        NEW_PATCH=$((PATCH + 1))
+        NEW_TAG="v$MAJOR.$MINOR.$NEW_PATCH"
+        
+        echo "New version: $NEW_TAG"
+        echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
     - name: Install Dependencies
       working-directory: ./mobile
       run: npm ci
@@ -43,13 +69,14 @@ jobs:
 
     - name: Rename APK
       run: |
-        mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/LyrinEye-${{ github.ref_name }}.apk
+        mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/LyrinEye-${{ steps.version.outputs.new_tag }}.apk
 
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
+    - name: Create Tag & Release
       uses: softprops/action-gh-release@v1
       with:
-        files: mobile/android/app/build/outputs/apk/release/LyrinEye-${{ github.ref_name }}.apk
+        tag_name: ${{ steps.version.outputs.new_tag }}
+        name: LyrinEye ${{ steps.version.outputs.new_tag }}
+        files: mobile/android/app/build/outputs/apk/release/LyrinEye-${{ steps.version.outputs.new_tag }}.apk
         draft: false
         prerelease: false
       env:
