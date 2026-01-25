@@ -15,3 +15,9 @@ variable "location" {
   description = "Azure region for resources"
   default     = "East US"
 }
+
+variable "github_username" {
+  type        = string
+  description = "GitHub username for GHCR"
+  default     = "cohgit"
+}

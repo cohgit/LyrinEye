@@ -81,7 +81,7 @@ resource "azurerm_container_app" "backend" {
   template {
     container {
       name   = "backend"
-      image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest" # Placeholder
+      image  = "ghcr.io/${var.github_username}/lyrineye-backend:latest"
       cpu    = 0.25
       memory = "0.5Gi"
 
@@ -97,7 +97,7 @@ resource "azurerm_container_app" "backend" {
 
   ingress {
     external_enabled = true
-    target_port      = 80
+    target_port      = 8080
     traffic_weight {
       percentage      = 100
       latest_revision = true
