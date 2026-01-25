@@ -57,13 +57,13 @@ const ViewerScreen = ({ navigation }: any) => {
         const pc = new RTCPeerConnection(configuration);
         pcRef.current = pc;
 
-        pc.onicecandidate = (event) => {
+        (pc as any).onicecandidate = (event: any) => {
             if (event.candidate) {
                 socketRef.current?.emit('ice-candidate', { roomId: 'default-room', candidate: event.candidate, to: monitorId });
             }
         };
 
-        pc.ontrack = (event) => {
+        (pc as any).ontrack = (event: any) => {
             console.log('Received remote track');
             if (event.streams && event.streams[0]) {
                 setRemoteStream(event.streams[0]);
