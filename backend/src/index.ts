@@ -56,6 +56,7 @@ io.on('connection', (socket: Socket) => {
     });
 
     socket.on('offer', (data: { roomId: string, offer: any, to?: string }) => {
+        console.log(`Offer received from ${socket.id} to ${data.to || 'room ' + data.roomId}`);
         if (data.to) {
             io.to(data.to).emit('offer', { from: socket.id, offer: data.offer });
         } else {
@@ -64,15 +65,21 @@ io.on('connection', (socket: Socket) => {
     });
 
     socket.on('answer', (data: { roomId: string, answer: any, to: string }) => {
+        console.log(`Answer received from ${socket.id} to ${data.to}`);
         io.to(data.to).emit('answer', { from: socket.id, answer: data.answer });
     });
 
     socket.on('ice-candidate', (data: { roomId: string, candidate: any, to?: string }) => {
+        console.log(`ICE candidate from ${socket.id} to ${data.to || 'room ' + data.roomId}`);
         if (data.to) {
             io.to(data.to).emit('ice-candidate', { from: socket.id, candidate: data.candidate });
         } else {
             socket.to(data.roomId).emit('ice-candidate', { from: socket.id, candidate: data.candidate });
         }
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`User disconnected: ${socket.id}`);
     });
 
     socket.on('disconnecting', () => {
