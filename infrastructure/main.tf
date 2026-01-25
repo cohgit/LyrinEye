@@ -1,25 +1,29 @@
 terraform {
+  required_version = ">= 1.0"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 4.0"
+      version = "~> 3.0"
     }
-  }
-
-  backend "remote" {
-    # Organization and workspace will be set via backend.hcl or command line
-    # Alternatively, you can hardcode them here after setting up TF Cloud
-    organization = "cogalde"
-
-    workspaces {
-      name = "lyrineye-infra"
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
     }
   }
 }
 
 provider "azurerm" {
   features {}
-  use_oidc = true
+  
+  use_oidc                   = true
+  use_cli                    = false
+  skip_provider_registration = false
+}
+
+resource "random_string" "suffix" {
+  length  = 6
+  special = false
+  upper   = false
 }
 
 resource "azurerm_resource_group" "main" {
@@ -29,7 +33,7 @@ resource "azurerm_resource_group" "main" {
 
 # --- Monitor & Logs ---
 resource "azurerm_log_analytics_workspace" "main" {
-  name                = "${var.project_name}-${var.environment}-law"
+  name                = "${var.project_name}-${var.environment}-law-${random_string.suffix.result}"
   location            = azurerm_resource_group.main.location
   resource_group_name = azurerm_resource_group.main.name
   sku                 = "PerGB2018"
@@ -38,7 +42,7 @@ resource "azurerm_log_analytics_workspace" "main" {
 
 # --- Storage (Tables & Blobs) ---
 resource "azurerm_storage_account" "main" {
-  name                     = "${var.project_name}${var.environment}st"
+  name                     = "${var.project_name}${var.environment}st${random_string.suffix.result}"
   resource_group_name      = azurerm_resource_group.main.name
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"
