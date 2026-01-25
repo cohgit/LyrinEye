@@ -8,6 +8,7 @@ RemoteLogger.init();
 
 const App = () => {
   useEffect(() => {
+    AzureLogger.checkInstallation();
     AzureLogger.log('App Started', { mode: 'system' });
 
     const intervalId = setInterval(async () => {

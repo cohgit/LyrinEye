@@ -1,5 +1,6 @@
 import DeviceInfo from 'react-native-device-info';
 import NetInfo from '@react-native-community/netinfo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Buffer } from 'buffer';
 import { sha256 } from 'js-sha256';
 
@@ -8,12 +9,24 @@ const WORKSPACE_ID = '4293cd25-8e2b-475a-a591-fc110d03fac7';
 const SHARED_KEY = 'PJPAhdMxZ2302xbfz5PDgfnkNTb1JHt/c5T1UFz7Q53S5gIYr6UxZwPbpTPm7OEIsbJPnhAEMxw7BAGXAGikuw==';
 
 class AzureLoggerService {
-    private appVersion = DeviceInfo.getVersion();
+    private appVersion = `${DeviceInfo.getVersion()}.${DeviceInfo.getBuildNumber()}`;
     private deviceName = '';
     private androidVersion = DeviceInfo.getSystemVersion();
 
     constructor() {
         DeviceInfo.getDeviceName().then(name => this.deviceName = name);
+    }
+
+    async checkInstallation() {
+        try {
+            const hasRun = await AsyncStorage.getItem('LYRINEYE_HAS_RUN');
+            if (!hasRun) {
+                await this.log('App Installed (First Run)', { mode: 'system' });
+                await AsyncStorage.setItem('LYRINEYE_HAS_RUN', 'true');
+            }
+        } catch (e) {
+            console.error('Failed to check installation status', e);
+        }
     }
 
     async getSystemMetrics() {
