@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Linking, Alert } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
-import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, mediaDevices, RTCView } from 'react-native-webrtc';
+import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, mediaDevices } from 'react-native-webrtc';
 import { io, Socket } from 'socket.io-client';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import { CONFIG } from '../config';
 
 const configuration = {
@@ -12,15 +13,20 @@ const configuration = {
     ],
 };
 
+const CHUNK_DURATION_MS = 30000; // 30 seconds
+
 const MonitorScreen = ({ navigation }: any) => {
     const device = useCameraDevice('back');
+    const cameraRef = useRef<Camera>(null);
     const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
     const { hasPermission: hasMicrophonePermission, requestPermission: requestMicrophonePermission } = useMicrophonePermission();
 
     const [isStreaming, setIsStreaming] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
     const socketRef = useRef<Socket | null>(null);
     const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
     const localStream = useRef<any>(null);
+    const recordingTimer = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         const checkPermissions = async () => {
@@ -33,10 +39,15 @@ const MonitorScreen = ({ navigation }: any) => {
     useEffect(() => {
         if (isStreaming) {
             startSignaling();
+            startRecordingCycle();
         } else {
             stopSignaling();
+            stopRecordingCycle();
         }
-        return () => stopSignaling();
+        return () => {
+            stopSignaling();
+            stopRecordingCycle();
+        };
     }, [isStreaming]);
 
     const startSignaling = async () => {
@@ -49,7 +60,7 @@ const MonitorScreen = ({ navigation }: any) => {
                     width: 640,
                     height: 480,
                     frameRate: 30,
-                    facingMode: 'environment', // Use back camera for monitor
+                    facingMode: 'environment',
                 }
             });
             localStream.current = stream;
@@ -58,9 +69,7 @@ const MonitorScreen = ({ navigation }: any) => {
                 socketRef.current?.emit('join-room', 'default-room', 'monitor');
             });
 
-            // When a viewer joins, start connection
             socketRef.current.on('viewer-joined', async (viewerId: string) => {
-                console.log('Viewer joined:', viewerId);
                 await initiateConnection(viewerId);
             });
 
@@ -103,6 +112,85 @@ const MonitorScreen = ({ navigation }: any) => {
         socketRef.current?.emit('offer', { roomId: 'default-room', offer, to: viewerId });
     };
 
+    const startRecordingCycle = async () => {
+        setIsRecording(true);
+        recordNextChunk();
+    };
+
+    const recordNextChunk = async () => {
+        if (!isStreaming || !cameraRef.current) return;
+
+        try {
+            const blobName = `rec_${Date.now()}.mp4`;
+
+            cameraRef.current.startRecording({
+                onRecordingFinished: (video) => {
+                    console.log('Recording finished:', video.path);
+                    uploadVideo(video.path, blobName);
+                },
+                onRecordingError: (error) => console.error('Recording error:', error),
+            });
+
+            // Set timer for next chunk
+            recordingTimer.current = setTimeout(async () => {
+                if (cameraRef.current) {
+                    await cameraRef.current.stopRecording();
+                    recordNextChunk(); // Chain next recording
+                }
+            }, CHUNK_DURATION_MS);
+
+        } catch (error) {
+            console.error('Failed to start chunk recording:', error);
+        }
+    };
+
+    const uploadVideo = async (filePath: string, blobName: string) => {
+        try {
+            // 1. Get SAS URL
+            const sasResponse = await fetch(`${CONFIG.SIGNALING_SERVER}/sas?blobName=${blobName}`);
+            const { uploadUrl } = await sasResponse.json();
+
+            // 2. Upload to Azure
+            await ReactNativeBlobUtil.fetch('PUT', uploadUrl, {
+                'x-ms-blob-type': 'BlockBlob',
+                'Content-Type': 'video/mp4',
+            }, ReactNativeBlobUtil.wrap(filePath));
+
+            console.log('Upload success:', blobName);
+
+            // 3. Save Metadata
+            await fetch(`${CONFIG.SIGNALING_SERVER}/recordings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    blobName,
+                    roomId: 'default-room',
+                    timestamp: Date.now(),
+                    duration: CHUNK_DURATION_MS / 1000
+                })
+            });
+
+            // 4. Clean up local file
+            await ReactNativeBlobUtil.fs.unlink(filePath);
+
+        } catch (error) {
+            console.error('Failed to upload video:', error);
+        }
+    };
+
+    const stopRecordingCycle = async () => {
+        setIsRecording(false);
+        if (recordingTimer.current) {
+            clearTimeout(recordingTimer.current);
+            recordingTimer.current = null;
+        }
+        if (cameraRef.current) {
+            try {
+                await cameraRef.current.stopRecording();
+            } catch (e) { }
+        }
+    };
+
     const stopSignaling = () => {
         socketRef.current?.disconnect();
         peerConnections.current.forEach(pc => pc.close());
@@ -140,8 +228,8 @@ const MonitorScreen = ({ navigation }: any) => {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.previewContainer}>
-                {/* LOCAL Camera Preview (Vision Camera) */}
                 <Camera
+                    ref={cameraRef}
                     style={StyleSheet.absoluteFill}
                     device={device}
                     isActive={true}
@@ -150,20 +238,20 @@ const MonitorScreen = ({ navigation }: any) => {
                 />
                 <View style={styles.overlay}>
                     {isStreaming && <View style={styles.recordingDot} />}
-                    <Text style={styles.liveIndicator}>{isStreaming ? 'STREAMING' : 'PREVIEW'}</Text>
+                    <Text style={styles.liveIndicator}>{isStreaming ? 'LIVE & RECORDING' : 'PREVIEW'}</Text>
                 </View>
             </View>
 
             <View style={styles.controls}>
                 <View style={styles.statusBadge}>
-                    <Text style={styles.statusText}>STATUS: {isStreaming ? 'LIVE' : 'READY'}</Text>
+                    <Text style={styles.statusText}>STATUS: {isStreaming ? 'STREAMING' : 'READY'}</Text>
                 </View>
 
                 <TouchableOpacity
                     style={[styles.startButton, isStreaming && styles.stopButton]}
                     onPress={() => setIsStreaming(!isStreaming)}
                 >
-                    <Text style={styles.startButtonText}>{isStreaming ? 'STOP STREAMING' : 'START STREAMING'}</Text>
+                    <Text style={styles.startButtonText}>{isStreaming ? 'STOP MONITORING' : 'START MONITORING'}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
