@@ -148,13 +148,14 @@ app.get('/sas', async (req, res) => {
 // Save Recording Metadata
 app.post('/recordings', async (req, res) => {
     try {
-        const { blobName, roomId, timestamp, duration } = req.body;
+        const { blobName, roomId, timestamp, duration, deviceId } = req.body;
 
         await tableClient.createEntity({
             partitionKey: roomId || 'default',
             rowKey: blobName,
             timestamp: new Date(timestamp),
             duration,
+            deviceId: deviceId || 'unknown',
             url: blobServiceClient.getContainerClient('recordings').getBlobClient(blobName).url
         });
 

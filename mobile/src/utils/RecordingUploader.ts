@@ -1,6 +1,7 @@
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { CONFIG } from '../config';
 import { AzureLogger } from './AzureLogger';
+import DeviceInfo from 'react-native-device-info';
 
 class RecordingUploadService {
 
@@ -43,7 +44,8 @@ class RecordingUploadService {
                     timestamp: new Date().toISOString(),
                     duration: durationSec,
                     // roomId could be retrieved from a store or context
-                    roomId: 'default-room'
+                    roomId: 'default-room',
+                    deviceId: await DeviceInfo.getUniqueId()
                 })
             });
 

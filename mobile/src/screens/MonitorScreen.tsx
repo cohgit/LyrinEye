@@ -7,6 +7,7 @@ import { CONFIG } from '../config';
 import { AzureLogger } from '../utils/AzureLogger';
 import { RecordingUploader } from '../utils/RecordingUploader';
 import { Telemetry } from '../utils/TelemetryService';
+import KeepAwake from 'react-native-keep-awake';
 
 const RECORDING_DURATION_MS = 15000; // 15 seconds per chunk
 
@@ -232,8 +233,13 @@ const MonitorScreen = ({ navigation }: any) => {
     const toggleWork = () => {
         // Simple toggle: Idle <-> Recording
         // Streaming is automatic triggered by viewers
-        if (mode === 'idle') setMode('recording');
-        else setMode('idle');
+        if (mode === 'idle') {
+            setMode('recording');
+            KeepAwake.activate();
+        } else {
+            setMode('idle');
+            KeepAwake.deactivate();
+        }
     };
 
     return (
