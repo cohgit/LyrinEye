@@ -51,7 +51,7 @@ class AzureLoggerService {
 
             const logEntry = {
                 AppVersion: this.appVersion,
-                LogText: message,
+                LogText: Object.keys(context).length > 0 ? `${message} ${JSON.stringify(context)}` : message,
                 Timestamp: new Date().toISOString(),
                 ClientIP: (netState.details as any)?.ipAddress || 'unknown',
                 WifiSSID: (netState.details as any)?.ssid || 'unknown', // Android specific, requires location permission often
