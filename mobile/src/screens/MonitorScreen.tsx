@@ -55,7 +55,13 @@ const MonitorScreen = ({ navigation }: any) => {
         // Start Telemetry
         Telemetry.start();
 
+        // App State Logging
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            AzureLogger.log('App State Changed', { state: nextAppState });
+        });
+
         return () => {
+            subscription.remove();
             Telemetry.stop();
             cleanupEverything();
         };
@@ -234,9 +240,11 @@ const MonitorScreen = ({ navigation }: any) => {
         // Simple toggle: Idle <-> Recording
         // Streaming is automatic triggered by viewers
         if (mode === 'idle') {
+            AzureLogger.log('User Started Monitoring');
             setMode('recording');
             KeepAwake.activate();
         } else {
+            AzureLogger.log('User Stopped Monitoring');
             setMode('idle');
             KeepAwake.deactivate();
         }
