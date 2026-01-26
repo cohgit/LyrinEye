@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, AppState } from 'react-native';
 import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, mediaDevices, RTCView } from 'react-native-webrtc';
-import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
+import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 import { io, Socket } from 'socket.io-client';
 import { CONFIG } from '../config';
 import { AzureLogger } from '../utils/AzureLogger';
@@ -28,7 +28,8 @@ const MonitorScreen = ({ navigation }: any) => {
 
     // VisionCamera Refs
     const device = useCameraDevice('back');
-    const { hasPermission, requestPermission } = useCameraPermission();
+    const { hasPermission: hasCamPermission, requestPermission: requestCamPermission } = useCameraPermission();
+    const { hasPermission: hasMicPermission, requestPermission: requestMicPermission } = useMicrophonePermission();
     const camera = useRef<Camera>(null);
     const isRecordingRef = useRef(false);
     const recordingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -36,9 +37,13 @@ const MonitorScreen = ({ navigation }: any) => {
     // Initial Permissions & Setup
     useEffect(() => {
         (async () => {
-            if (!hasPermission) {
-                const status = await requestPermission();
+            if (!hasCamPermission) {
+                const status = await requestCamPermission();
                 if (!status) Alert.alert("Permission required", "Camera permission is needed.");
+            }
+            if (!hasMicPermission) {
+                const status = await requestMicPermission();
+                if (!status) Alert.alert("Permission required", "Microphone permission is needed for recording.");
             }
         })();
 
@@ -186,7 +191,7 @@ const MonitorScreen = ({ navigation }: any) => {
                 },
                 onRecordingError: (error) => {
                     isRecordingRef.current = false;
-                    AzureLogger.log('Recording Error', { error: String(error) }, 'ERROR');
+                    AzureLogger.log('Recording Error', { error: JSON.stringify(error) }, 'ERROR');
                     // Retry?
                     if (mode === 'recording') setTimeout(startRecordingChunk, 2000);
                 }
@@ -229,7 +234,7 @@ const MonitorScreen = ({ navigation }: any) => {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.previewContainer}>
-                {mode === 'recording' && device && hasPermission ? (
+                {mode === 'recording' && device && hasCamPermission && hasMicPermission ? (
                     <Camera
                         ref={camera}
                         style={StyleSheet.absoluteFill}
