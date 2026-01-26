@@ -1,0 +1,11 @@
+diff --git a/node_modules/react-native-keep-awake/android/build.gradle b/node_modules/react-native-keep-awake/android/build.gradle
+index 5c3088b..47413c9 100644
+--- a/node_modules/react-native-keep-awake/android/build.gradle
++++ b/node_modules/react-native-keep-awake/android/build.gradle
+@@ -1,6 +1,6 @@
+ buildscript {
+     repositories {
+-        jcenter()
++        mavenCentral()
+         google()
+     }
