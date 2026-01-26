@@ -30,7 +30,6 @@
     "react-native-screens": "^4.20.0",
     "react-native-video": "^6.19.0",
     "react-native-vision-camera": "^4.7.3",
-    "react-native-vision-camera": "^4.7.3",
     "react-native-webrtc": "^124.0.7",
     "socket.io-client": "^4.8.3",
     "patch-package": "^8.0.0",
