@@ -152,7 +152,7 @@ const MonitorScreen = ({ navigation }: any) => {
 
         stream.getTracks().forEach((track: any) => pc.addTrack(track, stream));
 
-        pc.onicecandidate = (event: any) => {
+        (pc as any).onicecandidate = (event: any) => {
             if (event.candidate) {
                 socketRef.current?.emit('ice-candidate', { roomId: 'default-room', candidate: event.candidate, to: viewerId });
             }
