@@ -5,7 +5,8 @@ index 5c3088b..47413c9 100644
 @@ -1,6 +1,6 @@
  buildscript {
      repositories {
+         google()
 -        jcenter()
 +        mavenCentral()
-         google()
      }
+ 
