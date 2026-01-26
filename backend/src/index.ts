@@ -172,11 +172,35 @@ app.get('/recordings', async (req, res) => {
             queryOptions: { filter: `PartitionKey eq '${roomId}'` }
         });
 
+        // Parse connection string for SAS generation
+        const parts = CONNECTION_STRING.split(';');
+        const accountName = parts.find(p => p.startsWith('AccountName='))?.split('=')[1] || '';
+        const accountKey = parts.find(p => p.startsWith('AccountKey='))?.split('=')[1] || '';
+        const credential = new StorageSharedKeyCredential(accountName, accountKey);
+        const containerName = 'recordings';
+
         const list = [];
         for await (const entity of entities) {
-            list.push(entity);
+            // Generate Read SAS for playback
+            // Valid for 60 minutes
+            const blobName = entity.rowKey as string;
+            if (!blobName) continue;
+
+            const sasToken = generateBlobSASQueryParameters({
+                containerName,
+                blobName,
+                permissions: BlobSASPermissions.parse("r"), // Read only
+                expiresOn: new Date(new Date().valueOf() + 3600 * 1000),
+            }, credential).toString();
+
+            const fullUrl = `${blobServiceClient.getContainerClient(containerName).getBlobClient(blobName).url}?${sasToken}`;
+
+            list.push({
+                ...entity,
+                url: fullUrl // Override stored URL with fresh SAS URL
+            });
         }
-        res.send(list.sort((a: any, b: any) => b.timestamp - a.timestamp));
+        res.send(list.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
     } catch (error: any) {
         res.status(500).send({ error: error.message });
     }

@@ -6,6 +6,7 @@ import { io, Socket } from 'socket.io-client';
 import { CONFIG } from '../config';
 import { AzureLogger } from '../utils/AzureLogger';
 import { RecordingUploader } from '../utils/RecordingUploader';
+import { Telemetry } from '../utils/TelemetryService';
 
 const RECORDING_DURATION_MS = 15000; // 15 seconds per chunk
 
@@ -50,7 +51,11 @@ const MonitorScreen = ({ navigation }: any) => {
         // Connect Socket immediately to listen for viewers
         setupSocket();
 
+        // Start Telemetry
+        Telemetry.start();
+
         return () => {
+            Telemetry.stop();
             cleanupEverything();
         };
     }, []);
