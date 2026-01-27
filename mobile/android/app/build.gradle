@@ -83,9 +83,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.mobile"
+    namespace "com.mobile.lyrineye.app"
     defaultConfig {
-        applicationId "com.mobile"
+        applicationId "com.mobile.lyrineye.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode project.hasProperty('versionCode') ? project.property('versionCode').toInteger() : 1

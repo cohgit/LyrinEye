@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, Alert } from 'react-native';
+import { authService } from '../utils/AuthService';
 
 const HomeScreen = ({ navigation }: any) => {
   return (
@@ -11,8 +11,8 @@ const HomeScreen = ({ navigation }: any) => {
       </View>
 
       <View style={styles.cardContainer}>
-        <TouchableOpacity 
-          style={[styles.card, styles.monitorCard]} 
+        <TouchableOpacity
+          style={[styles.card, styles.monitorCard]}
           onPress={() => navigation.navigate('Monitor')}
         >
           <Text style={styles.cardEmoji}>📹</Text>
@@ -20,13 +20,23 @@ const HomeScreen = ({ navigation }: any) => {
           <Text style={styles.cardDescription}>Use this device as a security camera.</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.card, styles.viewerCard]} 
+        <TouchableOpacity
+          style={[styles.card, styles.viewerCard]}
           onPress={() => navigation.navigate('Viewer')}
         >
           <Text style={styles.cardEmoji}>📱</Text>
           <Text style={styles.cardTitle}>Viewer Mode</Text>
           <Text style={styles.cardDescription}>Watch your live streams and recordings.</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={async () => {
+            await authService.signOut();
+            navigation.replace('Login');
+          }}
+        >
+          <Text style={styles.logoutButtonText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -90,6 +100,18 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 24,
+  },
+  logoutButton: {
+    marginTop: 20,
+    paddingVertical: 12,
+    alignItems: 'center',
+    width: '100%',
+  },
+  logoutButtonText: {
+    color: '#64748B',
+    fontSize: 14,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });
 

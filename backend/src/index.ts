@@ -26,6 +26,7 @@ const CONNECTION_STRING = process.env.STORAGE_CONNECTION_STRING || '';
 // Azure Storage Initialization
 const blobServiceClient = BlobServiceClient.fromConnectionString(CONNECTION_STRING);
 const tableClient = TableClient.fromConnectionString(CONNECTION_STRING, 'camerametadata');
+const userDevicesClient = TableClient.fromConnectionString(CONNECTION_STRING, 'userdevices');
 
 // WebRTC Rooms
 const rooms = new Map<string, { monitor?: string, viewers: string[] }>();
@@ -33,9 +34,22 @@ const rooms = new Map<string, { monitor?: string, viewers: string[] }>();
 io.on('connection', (socket: Socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    socket.on('join-room', (roomId: string, role: 'monitor' | 'viewer') => {
+    socket.on('join-room', async (roomId: string, role: 'monitor' | 'viewer', email?: string) => {
+        if (role === 'viewer') {
+            if (!email) return socket.emit('error', 'Authentication required');
+
+            // Check authorization in UserDevices table
+            try {
+                const entity = await userDevicesClient.getEntity(email, roomId);
+                if (!entity) throw new Error('Unauthorized');
+            } catch (e) {
+                console.log(`Unauthorized access attempt by ${email} to ${roomId}`);
+                return socket.emit('error', 'Unauthorized access');
+            }
+        }
+
         socket.join(roomId);
-        console.log(`User ${socket.id} joined room ${roomId} as ${role}`);
+        console.log(`User ${socket.id} joined room ${roomId} as ${role} (${email || 'system'})`);
 
         if (!rooms.has(roomId)) {
             rooms.set(roomId, { viewers: [] });
@@ -148,7 +162,7 @@ app.get('/sas', async (req, res) => {
 // Save Recording Metadata
 app.post('/recordings', async (req, res) => {
     try {
-        const { blobName, roomId, timestamp, duration, deviceId } = req.body;
+        const { blobName, thumbnailBlobName, roomId, timestamp, duration, deviceId } = req.body;
 
         await tableClient.createEntity({
             partitionKey: roomId || 'default',
@@ -156,6 +170,7 @@ app.post('/recordings', async (req, res) => {
             timestamp: new Date(timestamp),
             duration,
             deviceId: deviceId || 'unknown',
+            thumbnailBlobName: thumbnailBlobName || '',
             url: blobServiceClient.getContainerClient('recordings').getBlobClient(blobName).url
         });
 
@@ -165,15 +180,72 @@ app.post('/recordings', async (req, res) => {
     }
 });
 
+// Register Device to User
+app.post('/register-device', async (req, res) => {
+    try {
+        const { deviceId, email } = req.body;
+        if (!deviceId || !email) return res.status(400).send({ error: 'deviceId and email are required' });
+
+        await userDevicesClient.upsertEntity({
+            partitionKey: email,
+            rowKey: deviceId,
+            registeredAt: new Date().toISOString()
+        });
+
+        res.send({ status: 'registered' });
+    } catch (error: any) {
+        res.status(500).send({ error: error.message });
+    }
+});
+
+// Share Device with another User
+app.post('/share-device', async (req, res) => {
+    try {
+        const { deviceId, ownerEmail, shareWithEmail } = req.body;
+
+        // Logical check: Is the requester the owner? 
+        // In a real app we'd check JWT, here for MVP we trust the payload or assume caller verified.
+
+        await userDevicesClient.upsertEntity({
+            partitionKey: shareWithEmail,
+            rowKey: deviceId,
+            sharedBy: ownerEmail,
+            sharedAt: new Date().toISOString(),
+            isShared: true
+        });
+
+        res.send({ status: 'shared' });
+    } catch (error: any) {
+        res.status(500).send({ error: error.message });
+    }
+});
+
 // List Recordings
 app.get('/recordings', async (req, res) => {
     try {
-        const roomId = req.query.roomId as string || 'default';
-        const entities = tableClient.listEntities({
-            queryOptions: { filter: `PartitionKey eq '${roomId}'` }
-        });
+        const roomId = req.query.roomId as string;
+        const email = req.query.email as string;
 
-        // Parse connection string for SAS generation
+        let entities;
+
+        // 1. Get all devices for this user (owned or shared)
+        const deviceIds: string[] = [];
+        if (email) {
+            const deviceEntities = userDevicesClient.listEntities({
+                queryOptions: { filter: `PartitionKey eq '${email}'` }
+            });
+            for await (const dev of deviceEntities) {
+                deviceIds.push(dev.rowKey as string);
+            }
+
+            if (deviceIds.length === 0) return res.send([]);
+            entities = tableClient.listEntities();
+        } else {
+            entities = tableClient.listEntities({
+                queryOptions: { filter: `PartitionKey eq '${roomId || 'default'}'` }
+            });
+        }
+
         const parts = CONNECTION_STRING.split(';');
         const accountName = parts.find(p => p.startsWith('AccountName='))?.split('=')[1] || '';
         const accountKey = parts.find(p => p.startsWith('AccountKey='))?.split('=')[1] || '';
@@ -182,26 +254,42 @@ app.get('/recordings', async (req, res) => {
 
         const list = [];
         for await (const entity of entities) {
-            // Generate Read SAS for playback
-            // Valid for 60 minutes
             const blobName = entity.rowKey as string;
             if (!blobName) continue;
 
             const sasToken = generateBlobSASQueryParameters({
                 containerName,
                 blobName,
-                permissions: BlobSASPermissions.parse("r"), // Read only
+                permissions: BlobSASPermissions.parse("r"),
                 expiresOn: new Date(new Date().valueOf() + 3600 * 1000),
             }, credential).toString();
 
             const fullUrl = `${blobServiceClient.getContainerClient(containerName).getBlobClient(blobName).url}?${sasToken}`;
 
+            let thumbnailUrl = '';
+            if (entity.thumbnailBlobName) {
+                const thumbBlobName = entity.thumbnailBlobName as string;
+                const thumbSasToken = generateBlobSASQueryParameters({
+                    containerName,
+                    blobName: thumbBlobName,
+                    permissions: BlobSASPermissions.parse("r"),
+                    expiresOn: new Date(new Date().valueOf() + 3600 * 1000),
+                }, credential).toString();
+                thumbnailUrl = `${blobServiceClient.getContainerClient(containerName).getBlobClient(thumbBlobName).url}?${thumbSasToken}`;
+            }
+
             list.push({
                 ...entity,
-                url: fullUrl // Override stored URL with fresh SAS URL
+                url: fullUrl,
+                thumbnailUrl
             });
         }
-        res.send(list.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+
+        const finalResults = email
+            ? list.filter((r: any) => deviceIds.includes(r.deviceId))
+            : list;
+
+        res.send(finalResults.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
     } catch (error: any) {
         res.status(500).send({ error: error.message });
     }

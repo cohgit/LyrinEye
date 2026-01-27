@@ -37,16 +37,16 @@ class TelemetryService {
             const usedMemory = await DeviceInfo.getUsedMemory(); // Might require newer versions or specific platform support
 
             const telemetryData = {
-                batteryLevel: (batteryLevel * 100).toFixed(1) + '%',
-                storageFreeMB: (freeDisk / 1024 / 1024).toFixed(0),
-                ramUsedMB: (usedMemory / 1024 / 1024).toFixed(0),
-                ramTotalMB: (totalMemory / 1024 / 1024).toFixed(0),
-                cpu: 'N/A', // High overhead to measure CPU usage in JS thread reliably without native heavy lifting
-                isCharging: await DeviceInfo.isBatteryCharging(),
-                timestamp: new Date().toISOString()
+                BatteryLevel: (batteryLevel * 100).toFixed(1) + '%',
+                StorageFreeMB: (freeDisk / 1024 / 1024).toFixed(0),
+                RamUsedMB: (usedMemory / 1024 / 1024).toFixed(0),
+                RamTotalMB: (totalMemory / 1024 / 1024).toFixed(0),
+                CPUUsage: 'N/A',
+                IsCharging: await DeviceInfo.isBatteryCharging(),
+                Timestamp: new Date().toISOString()
             };
 
-            AzureLogger.log('System Telemetry', telemetryData, 'INFO'); // Or a specific 'METRIC' type if we had one
+            await AzureLogger.telemetry(telemetryData);
 
         } catch (error) {
             console.warn('Failed to collect telemetry', error);

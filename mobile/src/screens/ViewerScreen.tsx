@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, FlatList, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, FlatList, ScrollView, Alert, Image } from 'react-native';
 import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, RTCView } from 'react-native-webrtc';
 import { io, Socket } from 'socket.io-client';
-import Video from 'react-native-video'; // We should probably use this for recorded files
+import Video from 'react-native-video';
 import { CONFIG } from '../config';
+import { authService } from '../utils/AuthService';
 
 const configuration = {
     iceServers: [
@@ -18,21 +19,35 @@ const ViewerScreen = ({ navigation }: any) => {
     const [recordings, setRecordings] = useState<any[]>([]);
     const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'live' | 'recordings'>('recordings');
+    const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+    const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [selectedHour, setSelectedHour] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
     // ...
 
     const handleTabChange = (tab: 'live' | 'recordings') => {
         if (tab === 'live') {
+            if (!selectedDeviceId) {
+                Alert.alert("Select a Device", "Please select a device from the filter above to watch live feed.");
+                return;
+            }
             Alert.alert(
                 "Stop Recording?",
                 "Viewing the live stream will pause recording on the Monitor device. Continue?",
                 [
                     { text: "Cancel", style: "cancel" },
-                    { text: "Continue", onPress: () => setActiveTab('live') }
+                    {
+                        text: "Continue", onPress: () => {
+                            setActiveTab('live');
+                            connectToSignaling();
+                        }
+                    }
                 ]
             );
         } else {
             setActiveTab('recordings');
+            cleanupWebRTC();
             fetchRecordings();
         }
     };
@@ -47,21 +62,32 @@ const ViewerScreen = ({ navigation }: any) => {
     }, []);
 
     const fetchRecordings = async () => {
+        setLoading(true);
         try {
-            const response = await fetch(`${CONFIG.SIGNALING_SERVER}/recordings?roomId=default-room`);
+            const user = await authService.getCurrentUser();
+            const baseUrl = `${CONFIG.SIGNALING_SERVER}/recordings`;
+            const url = user ? `${baseUrl}?email=${encodeURIComponent(user.user.email)}` : baseUrl;
+
+            const response = await fetch(url);
             const data = await response.json();
             setRecordings(data);
         } catch (error) {
             console.error('Failed to fetch recordings:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
-    const connectToSignaling = () => {
+    const connectToSignaling = async () => {
+        const user = await authService.getCurrentUser();
+        if (!user || (!selectedDeviceId && activeTab === 'live')) return;
+
+        const targetDevice = selectedDeviceId || 'default-room'; // Fallback if needed
         socketRef.current = io(CONFIG.SIGNALING_SERVER);
 
         socketRef.current.on('connect', () => {
             setStatus('Searching for monitor...');
-            socketRef.current?.emit('join-room', 'default-room', 'viewer');
+            socketRef.current?.emit('join-room', targetDevice, 'viewer', user.user.email);
         });
 
         socketRef.current.on('monitor-online', () => {
@@ -126,17 +152,25 @@ const ViewerScreen = ({ navigation }: any) => {
         return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     };
 
-    const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
-
     const uniqueDevices = Array.from(new Set(recordings.map(r => r.deviceId).filter(Boolean)));
     const uniqueDates = Array.from(new Set(recordings.map(r => new Date(r.timestamp).toLocaleDateString()))).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
-    const filteredRecordings = recordings.filter(r => {
-        const matchesDevice = selectedDeviceId ? r.deviceId === selectedDeviceId : true;
-        const matchesDate = selectedDate ? new Date(r.timestamp).toLocaleDateString() === selectedDate : true;
-        return matchesDevice && matchesDate;
-    });
+    const uniqueHours = selectedDate
+        ? Array.from(new Set(recordings
+            .filter(r => new Date(r.timestamp).toLocaleDateString() === selectedDate)
+            .map(r => new Date(r.timestamp).getHours())))
+            .sort((a, b) => a - b)
+        : [];
+
+    const filteredRecordings = recordings
+        .filter(r => {
+            const date = new Date(r.timestamp);
+            const matchesDevice = selectedDeviceId ? r.deviceId === selectedDeviceId : true;
+            const matchesDate = selectedDate ? date.toLocaleDateString() === selectedDate : true;
+            const matchesHour = selectedHour !== null ? date.getHours() === parseInt(selectedHour) : true;
+            return matchesDevice && matchesDate && matchesHour;
+        })
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     return (
         <SafeAreaView style={styles.container}>
@@ -200,7 +234,7 @@ const ViewerScreen = ({ navigation }: any) => {
                             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterContent}>
                                 <TouchableOpacity
                                     style={[styles.filterChip, !selectedDate && styles.activeFilter]}
-                                    onPress={() => setSelectedDate(null)}
+                                    onPress={() => { setSelectedDate(null); setSelectedHour(null); }}
                                 >
                                     <Text style={[styles.filterText, !selectedDate && styles.activeFilterText]}>All Dates</Text>
                                 </TouchableOpacity>
@@ -208,12 +242,33 @@ const ViewerScreen = ({ navigation }: any) => {
                                     <TouchableOpacity
                                         key={date}
                                         style={[styles.filterChip, selectedDate === date && styles.activeFilter]}
-                                        onPress={() => setSelectedDate(date)}
+                                        onPress={() => { setSelectedDate(date); setSelectedHour(null); }}
                                     >
                                         <Text style={[styles.filterText, selectedDate === date && styles.activeFilterText]}>📅 {date}</Text>
                                     </TouchableOpacity>
                                 ))}
                             </ScrollView>
+
+                            {/* Hour Filter */}
+                            {selectedDate && uniqueHours.length > 0 && (
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow} contentContainerStyle={styles.filterContent}>
+                                    <TouchableOpacity
+                                        style={[styles.filterChip, selectedHour === null && styles.activeFilter]}
+                                        onPress={() => setSelectedHour(null)}
+                                    >
+                                        <Text style={[styles.filterText, selectedHour === null && styles.activeFilterText]}>All Hours</Text>
+                                    </TouchableOpacity>
+                                    {uniqueHours.map(hour => (
+                                        <TouchableOpacity
+                                            key={hour}
+                                            style={[styles.filterChip, selectedHour === hour.toString() && styles.activeFilter]}
+                                            onPress={() => setSelectedHour(hour.toString())}
+                                        >
+                                            <Text style={[styles.filterText, selectedHour === hour.toString() && styles.activeFilterText]}>⏰ {hour}:00</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            )}
                         </View>
                     )}
 
@@ -242,12 +297,20 @@ const ViewerScreen = ({ navigation }: any) => {
                                     onPress={() => setSelectedVideo(item.url)}
                                 >
                                     <View style={styles.recordingIcon}>
-                                        <Text style={{ fontSize: 24 }}>🎥</Text>
+                                        {item.thumbnailUrl ? (
+                                            <Image
+                                                source={{ uri: item.thumbnailUrl }}
+                                                style={styles.thumbnail}
+                                                resizeMode="cover"
+                                            />
+                                        ) : (
+                                            <Text style={{ fontSize: 24 }}>🎥</Text>
+                                        )}
                                     </View>
                                     <View style={styles.recordingInfo}>
                                         <Text style={styles.recordingDate}>{formatDate(item.timestamp)}</Text>
                                         <Text style={styles.recordingDetails}>
-                                            {item.duration}s • {item.deviceId ? `📱 ${item.deviceId.slice(0, 8)}` : 'Unknown'}
+                                            ⏰ {new Date(item.timestamp).getHours().toString().padStart(2, '0')}:00h • {item.duration}s • {item.deviceId ? `📱 ${item.deviceId.slice(0, 8)}` : 'Unknown'}
                                         </Text>
                                     </View>
                                 </TouchableOpacity>
@@ -266,9 +329,17 @@ const ViewerScreen = ({ navigation }: any) => {
             <View style={styles.footer}>
                 <TouchableOpacity
                     style={styles.backButton}
-                    onPress={() => navigation.goBack()}
+                    onPress={() => {
+                        if (selectedVideo) {
+                            setSelectedVideo(null);
+                        } else {
+                            navigation.goBack();
+                        }
+                    }}
                 >
-                    <Text style={styles.backButtonText}>Return to Home</Text>
+                    <Text style={styles.backButtonText}>
+                        {selectedVideo ? "Close Player" : "Return to Home"}
+                    </Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -304,6 +375,7 @@ const styles = StyleSheet.create({
     activeFilter: { backgroundColor: '#0EA5E9', borderColor: '#0EA5E9' },
     filterText: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
     activeFilterText: { color: '#FFF' },
+    thumbnail: { width: '100%', height: '100%', borderRadius: 12 },
 });
 
 export default ViewerScreen;

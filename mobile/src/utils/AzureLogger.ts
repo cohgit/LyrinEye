@@ -45,34 +45,39 @@ class AzureLoggerService {
         }
     }
 
-    async log(message: string, context: Record<string, any> = {}, level: 'INFO' | 'ERROR' | 'WARN' = 'INFO') {
+    async telemetry(metrics: Record<string, any>) {
+        await this.log('System Telemetry', metrics, 'INFO', 'LyrinEyeTelemetria');
+    }
+
+    async log(message: string, context: Record<string, any> = {}, level: 'INFO' | 'ERROR' | 'WARN' = 'INFO', logType = 'LyrinEyeLogs') {
         try {
             const netState = await NetInfo.fetch();
 
             const logEntry = {
                 AppVersion: this.appVersion,
-                LogText: Object.keys(context).length > 0 ? `${message} ${JSON.stringify(context)}` : message,
+                LogText: message,
                 Timestamp: new Date().toISOString(),
                 ClientIP: (netState.details as any)?.ipAddress || 'unknown',
-                WifiSSID: (netState.details as any)?.ssid || 'unknown', // Android specific, requires location permission often
+                WifiSSID: (netState.details as any)?.ssid || 'unknown',
                 DeviceName: this.deviceName,
                 AndroidVersion: this.androidVersion,
                 ConnectionStart: netState.isConnected,
                 Mode: context.mode || 'unknown',
                 Streaming: context.streaming || false,
                 Exceptions: context.error ? String(context.error) : null,
-                LogLevel: level
+                LogLevel: level,
+                ...context // Flattening context for explicit columns in Azure
             };
 
-            await this.sendToAzure(logEntry);
+            await this.sendToAzure(logEntry, logType);
         } catch (err) {
             console.error('Failed to send log to Azure:', err);
         }
     }
 
-    private async sendToAzure(jsonPayload: any) {
+    private async sendToAzure(jsonPayload: any, logType: string) {
         const date = new Date().toUTCString();
-        const body = JSON.stringify([jsonPayload]); // Azure expects an array
+        const body = JSON.stringify([jsonPayload]);
         const contentLength = Buffer.byteLength(body, 'utf8');
 
         const signature = this.buildSignature(date, contentLength);
@@ -81,7 +86,7 @@ class AzureLoggerService {
             method: 'POST',
             headers: {
                 'Authorization': signature,
-                'Log-Type': 'LyrinEyeLogs',
+                'Log-Type': logType,
                 'x-ms-date': date,
                 'time-generated-field': 'Timestamp',
                 'Content-Type': 'application/json'

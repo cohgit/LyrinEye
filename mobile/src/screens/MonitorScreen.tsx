@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, AppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, AppState, Modal, TextInput } from 'react-native';
 import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, mediaDevices, RTCView } from 'react-native-webrtc';
+import DeviceInfo from 'react-native-device-info';
 import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
 import { io, Socket } from 'socket.io-client';
 import { CONFIG } from '../config';
 import { AzureLogger } from '../utils/AzureLogger';
 import { RecordingUploader } from '../utils/RecordingUploader';
+import { authService } from '../utils/AuthService';
 import { Telemetry } from '../utils/TelemetryService';
 import KeepAwake from 'react-native-keep-awake';
 
@@ -52,6 +54,24 @@ const MonitorScreen = ({ navigation }: any) => {
         // Connect Socket immediately to listen for viewers
         setupSocket();
 
+        // Register Device if logged in
+        (async () => {
+            const user = await authService.getCurrentUser();
+            if (user) {
+                const deviceId = await DeviceInfo.getUniqueId();
+                try {
+                    await fetch(`${CONFIG.SIGNALING_SERVER}/register-device`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ deviceId, email: user.user.email })
+                    });
+                    AzureLogger.log('Device Registered', { email: user.user.email });
+                } catch (e) {
+                    AzureLogger.log('Device Registration Failed', { error: String(e) }, 'WARN');
+                }
+            }
+        })();
+
         // Start Telemetry
         Telemetry.start();
 
@@ -90,35 +110,29 @@ const MonitorScreen = ({ navigation }: any) => {
     const setupSocket = () => {
         if (socketRef.current) return;
 
-        AzureLogger.log('Connecting to Signaling Server', { url: CONFIG.SIGNALING_SERVER });
-        socketRef.current = io(CONFIG.SIGNALING_SERVER, {
-            transports: ['websocket'],
-            path: '/socket.io'
-        });
+        socketRef.current = io(CONFIG.SIGNALING_SERVER);
 
-        socketRef.current.on('connect', () => {
-            AzureLogger.log('Connected to Backend', { socketId: socketRef.current?.id });
-            socketRef.current?.emit('join-room', 'default-room', 'monitor');
-        });
-
-        socketRef.current.on('viewer-joined', async (viewerId: string) => {
+        socketRef.current?.on('viewer-joined', async (viewerId: string) => {
             AzureLogger.log('Viewer Joined - Switching to Stream', { viewerId });
-            // Priority Interrupt: Stop recording, Start Streaming
             setMode('streaming');
             pendingViewers.current.push(viewerId);
         });
 
-        socketRef.current.on('answer', async ({ from, answer }: any) => {
+        socketRef.current?.on('answer', async ({ from, answer }: any) => {
             const pc = peerConnections.current.get(from);
-            if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            if (pc) {
+                await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            }
         });
 
-        socketRef.current.on('ice-candidate', async ({ from, candidate }: any) => {
+        socketRef.current?.on('ice-candidate', async ({ from, candidate }: any) => {
             const pc = peerConnections.current.get(from);
-            if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            if (pc) {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            }
         });
 
-        socketRef.current.on('monitor-offline', () => { /* no-op */ });
+        socketRef.current?.on('monitor-offline', () => { /* no-op */ });
     };
 
     const pendingViewers = useRef<string[]>([]);
@@ -182,9 +196,13 @@ const MonitorScreen = ({ navigation }: any) => {
         if (!camera.current || mode !== 'recording') return;
 
         try {
-            if (isRecordingRef.current) return; // Prevent double start
+            if (isRecordingRef.current) return;
 
-            AzureLogger.log('Starting Recording Chunk');
+            // Take matching snapshot for this chunk
+            const photo = await camera.current.takePhoto({ flash: 'off' });
+            const snapshotPath = photo.path;
+
+            AzureLogger.log('Starting Recording Chunk with Snapshot');
             isRecordingRef.current = true;
 
             camera.current.startRecording({
@@ -192,8 +210,8 @@ const MonitorScreen = ({ navigation }: any) => {
                     isRecordingRef.current = false;
                     AzureLogger.log('Recording Finished', { path: video.path });
 
-                    // Upload in background
-                    RecordingUploader.uploadRecording(video.path, video.duration)
+                    // Upload in background with snapshot
+                    RecordingUploader.uploadRecording(video.path, video.duration, snapshotPath)
                         .catch(e => AzureLogger.log('Upload Failed', { error: String(e) }, 'ERROR'));
 
                     // Start next chunk immediately if still in recording mode
@@ -250,10 +268,43 @@ const MonitorScreen = ({ navigation }: any) => {
         }
     };
 
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [shareEmail, setShareEmail] = useState('');
+    const [isSharing, setIsSharing] = useState(false);
+
+    const handleShare = async () => {
+        if (!shareEmail.trim()) return;
+        setIsSharing(true);
+        try {
+            const user = await authService.getCurrentUser();
+            const deviceId = await DeviceInfo.getUniqueId();
+            const response = await fetch(`${CONFIG.SIGNALING_SERVER}/share-device`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    deviceId,
+                    ownerEmail: user?.user.email,
+                    shareWithEmail: shareEmail.trim().toLowerCase()
+                })
+            });
+            if (response.ok) {
+                Alert.alert("Success", `Monitor shared with ${shareEmail}`);
+                setShowShareModal(false);
+                setShareEmail('');
+            } else {
+                throw new Error("Failed to share");
+            }
+        } catch (error) {
+            Alert.alert("Error", "Could not share monitor. Please try again.");
+        } finally {
+            setIsSharing(false);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.previewContainer}>
-                {mode === 'recording' && device && hasCamPermission && hasMicPermission ? (
+            <View style={styles.cameraContainer}>
+                {device && (mode === 'recording' || mode === 'idle') ? (
                     <Camera
                         ref={camera}
                         style={StyleSheet.absoluteFill}
@@ -261,62 +312,111 @@ const MonitorScreen = ({ navigation }: any) => {
                         isActive={true}
                         video={true}
                         audio={true}
+                        photo={true}
                     />
                 ) : mode === 'streaming' && localStreamUrl ? (
                     <RTCView
                         streamURL={localStreamUrl}
-                        style={styles.fullVideo}
+                        style={StyleSheet.absoluteFill}
                         objectFit="cover"
-                        mirror={false}
                     />
                 ) : (
-                    <View style={styles.centered}>
-                        <ActivityIndicator size="large" color="#0EA5E9" />
-                        <Text style={styles.placeholderText}>
-                            {mode === 'idle' ? 'Ready to Monitor' : 'Initializing...'}
-                        </Text>
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#0ea5e9" />
+                        <Text style={styles.loadingText}>Initializing Camera...</Text>
                     </View>
                 )}
 
+                {/* Overlays */}
                 <View style={styles.overlay}>
-                    <Text style={[styles.liveIndicator, mode === 'recording' ? { backgroundColor: '#EF4444' } : {}]}>
-                        {mode.toUpperCase()}
-                    </Text>
+                    <View style={styles.header}>
+                        <View>
+                            <Text style={styles.title}>Monitor Active</Text>
+                            <Text style={styles.status}>
+                                {mode === 'streaming' ? 'SHARING LIVE FEED 🔴' :
+                                    mode === 'recording' ? 'RECORDING CHUNKS 📹' : 'IDLE ⚪'}
+                            </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <TouchableOpacity
+                                style={styles.shareButton}
+                                onPress={() => setShowShareModal(true)}
+                            >
+                                <Text style={{ fontSize: 20 }}>👥</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.stopButton} onPress={toggleWork}>
+                                <Text style={styles.stopButtonText}>{mode === 'idle' ? 'START' : 'STOP'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
             </View>
 
-            <View style={styles.controls}>
-                <TouchableOpacity
-                    style={[styles.startButton, mode !== 'idle' && styles.stopButton]}
-                    onPress={toggleWork}
-                >
-                    <Text style={styles.startButtonText}>
-                        {mode === 'idle' ? 'START MONITORING' : 'STOP MONITORING'}
-                    </Text>
-                </TouchableOpacity>
+            <Modal
+                visible={showShareModal}
+                transparent={true}
+                animationType="slide"
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Share Monitor</Text>
+                        <Text style={styles.modalSubtitle}>Enter the email of the person you want to share this camera with.</Text>
 
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Text style={styles.backButtonText}>Back</Text>
-                </TouchableOpacity>
-            </View>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="user@gmail.com"
+                            placeholderTextColor="#94A3B8"
+                            value={shareEmail}
+                            onChangeText={setShareEmail}
+                            autoCapitalize="none"
+                            keyboardType="email-address"
+                        />
+
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.cancelButton]}
+                                onPress={() => setShowShareModal(false)}
+                            >
+                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.confirmButton]}
+                                onPress={handleShare}
+                                disabled={isSharing}
+                            >
+                                {isSharing ? <ActivityIndicator color="#FFF" /> : <Text style={styles.confirmButtonText}>Share</Text>}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000' },
-    previewContainer: { flex: 3 },
-    fullVideo: { ...StyleSheet.absoluteFillObject },
-    centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    overlay: { position: 'absolute', top: 32, right: 32 },
-    placeholderText: { color: '#94A3B8', fontSize: 18, marginTop: 16 },
-    liveIndicator: { color: '#FFF', backgroundColor: 'rgba(34, 197, 94, 0.8)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 4, fontWeight: '800' },
-    controls: { flex: 1, backgroundColor: '#0F172A', borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 32, alignItems: 'center', justifyContent: 'center' },
-    startButton: { backgroundColor: '#0EA5E9', width: '100%', paddingVertical: 18, borderRadius: 16, alignItems: 'center', marginBottom: 16 },
-    stopButton: { backgroundColor: '#64748B' },
-    startButtonText: { color: '#FFF', fontSize: 18, fontWeight: '800' },
-    backButton: { padding: 12 },
-    backButtonText: { color: '#64748B', fontSize: 16 },
+    cameraContainer: { flex: 1, position: 'relative' },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A' },
+    loadingText: { color: '#94A3B8', fontSize: 16, marginTop: 16 },
+    overlay: { position: 'absolute', top: 0, left: 0, right: 0, padding: 24 },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    title: { color: '#FFF', fontSize: 24, fontWeight: '900' },
+    status: { color: '#94A3B8', fontSize: 12, fontWeight: '700', marginTop: 4 },
+    stopButton: { backgroundColor: 'rgba(239, 68, 68, 0.8)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
+    stopButtonText: { color: '#FFF', fontWeight: 'bold' },
+    shareButton: { backgroundColor: 'rgba(255, 255, 255, 0.2)', padding: 10, borderRadius: 12, marginRight: 10 },
+    modalContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 24 },
+    modalContent: { backgroundColor: '#1E293B', borderRadius: 24, padding: 24 },
+    modalTitle: { color: '#FFF', fontSize: 24, fontWeight: '700', marginBottom: 12 },
+    modalSubtitle: { color: '#94A3B8', fontSize: 14, marginBottom: 20, lineHeight: 20 },
+    input: { backgroundColor: '#0F172A', borderRadius: 12, padding: 16, color: '#FFF', fontSize: 16, marginBottom: 24 },
+    modalButtons: { flexDirection: 'row', gap: 12 },
+    modalButton: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+    cancelButton: { backgroundColor: 'transparent' },
+    confirmButton: { backgroundColor: '#0EA5E9' },
+    cancelButtonText: { color: '#94A3B8', fontWeight: '600' },
+    confirmButtonText: { color: '#FFF', fontWeight: '700' },
 });
 
 export default MonitorScreen;

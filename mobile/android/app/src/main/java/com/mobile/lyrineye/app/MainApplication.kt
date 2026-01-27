@@ -1,4 +1,4 @@
-package com.mobile
+package com.mobile.lyrineye.app
 
 import android.app.Application
 import com.facebook.react.PackageList

@@ -11,6 +11,10 @@ const App = () => {
     AzureLogger.checkInstallation();
     AzureLogger.log('App Started', { mode: 'system' });
 
+    // We can't use navigation here easily without a ref, 
+    // but the AppNavigator initialRouteName logic or a simple Splash check is better.
+    // For now, let's just keep the metrics interval.
+
     const intervalId = setInterval(async () => {
       const metrics = await AzureLogger.getSystemMetrics();
       AzureLogger.log('System Status', { mode: 'system', ...metrics });
