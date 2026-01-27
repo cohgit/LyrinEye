@@ -16,8 +16,9 @@ class AuthService {
         try {
             await GoogleSignin.hasPlayServices();
             const userInfo = await GoogleSignin.signIn();
-            await AsyncStorage.setItem(USER_SESSION_KEY, JSON.stringify(userInfo));
-            return userInfo;
+            const standardizedUser = userInfo.data ? userInfo.data.user : userInfo.user;
+            await AsyncStorage.setItem(USER_SESSION_KEY, JSON.stringify(standardizedUser));
+            return userInfo; // Keep returning original for LoginScreen type check
         } catch (error) {
             console.error('Sign-In Error:', error);
             throw error;
@@ -36,9 +37,7 @@ class AuthService {
     async getCurrentUser() {
         const session = await AsyncStorage.getItem(USER_SESSION_KEY);
         if (!session) return null;
-        const userInfo = JSON.parse(session);
-        // Standardize returning the User object
-        return userInfo.data ? userInfo.data : userInfo;
+        return JSON.parse(session); // Now stores the flattened user object
     }
 }
 

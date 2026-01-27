@@ -62,13 +62,14 @@ const MonitorScreen = ({ navigation }: any) => {
             if (user) {
                 const deviceId = await DeviceInfo.getUniqueId();
                 try {
+                    const normalizedEmail = user.email.toLowerCase();
                     await fetch(`${CONFIG.SIGNALING_SERVER}/register-device`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ deviceId, email: user.email })
+                        body: JSON.stringify({ deviceId, email: normalizedEmail })
                     });
-                    console.log(`[APP] Device ${deviceId} registered for ${user.email}`);
-                    AzureLogger.log('Device Registered', { email: user.email, deviceId });
+                    console.log(`[APP] Device ${deviceId} registered for ${normalizedEmail}`);
+                    AzureLogger.log('Device Registered', { email: normalizedEmail, deviceId });
                 } catch (e) {
                     console.error(`[APP] Device Registration Failed: ${e}`);
                     AzureLogger.log('Device Registration Failed', { error: String(e) }, 'WARN');
