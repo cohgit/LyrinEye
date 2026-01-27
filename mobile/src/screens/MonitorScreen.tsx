@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, AppState, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, AppState, Modal, TextInput, Dimensions } from 'react-native';
 import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, mediaDevices, RTCView } from 'react-native-webrtc';
 import DeviceInfo from 'react-native-device-info';
-import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission } from 'react-native-vision-camera';
+import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission, Orientation } from 'react-native-vision-camera';
 import { io, Socket } from 'socket.io-client';
 import { CONFIG } from '../config';
 import { AzureLogger } from '../utils/AzureLogger';
@@ -25,6 +25,7 @@ const MonitorScreen = ({ navigation }: any) => {
     const [mode, setMode] = useState<'idle' | 'recording' | 'streaming'>('idle');
     const [localStreamUrl, setLocalStreamUrl] = useState<string | null>(null);
     const [isCameraActive, setIsCameraActive] = useState(false);
+    const [orientation, setOrientation] = useState<Orientation>('portrait');
 
     // WebRTC Refs
     const socketRef = useRef<Socket | null>(null);
@@ -78,6 +79,14 @@ const MonitorScreen = ({ navigation }: any) => {
         // Start Telemetry
         Telemetry.start();
 
+        // Orientation listener
+        const updateOrientation = () => {
+            const { width, height } = Dimensions.get('window');
+            setOrientation(width > height ? 'landscape-left' : 'portrait');
+        };
+        const dimSubscription = Dimensions.addEventListener('change', updateOrientation);
+        updateOrientation();
+
         // App State Logging
         const subscription = AppState.addEventListener('change', nextAppState => {
             AzureLogger.log('App State Changed', { state: nextAppState });
@@ -85,6 +94,7 @@ const MonitorScreen = ({ navigation }: any) => {
 
         return () => {
             subscription.remove();
+            dimSubscription.remove();
             Telemetry.stop();
             cleanupEverything();
         };
@@ -324,6 +334,7 @@ const MonitorScreen = ({ navigation }: any) => {
                         video={true}
                         audio={true}
                         photo={true}
+                        orientation={orientation}
                     />
                 ) : mode === 'streaming' && localStreamUrl ? (
                     <RTCView

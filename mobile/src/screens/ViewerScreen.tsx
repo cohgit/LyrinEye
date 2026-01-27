@@ -23,6 +23,7 @@ const ViewerScreen = ({ navigation }: any) => {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [selectedHour, setSelectedHour] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [rotation, setRotation] = useState(0);
 
     // ...
 
@@ -71,8 +72,13 @@ const ViewerScreen = ({ navigation }: any) => {
             console.log(`[APP] Fetching recordings for ${user?.email} from ${url}`);
             const response = await fetch(url);
             const data = await response.json();
-            console.log(`[APP] Received ${data.length} recordings`);
-            setRecordings(data);
+            if (Array.isArray(data)) {
+                console.log(`[APP] Received ${data.length} recordings`);
+                setRecordings(data);
+            } else {
+                console.warn(`[APP] Unexpected response format:`, data);
+                setRecordings([]);
+            }
         } catch (error) {
             console.error('Failed to fetch recordings:', error);
         } finally {
@@ -199,12 +205,20 @@ const ViewerScreen = ({ navigation }: any) => {
             {activeTab === 'live' ? (
                 <View style={styles.content}>
                     {remoteStream ? (
-                        <RTCView
-                            streamURL={remoteStream.toURL()}
-                            style={styles.fullVideo}
-                            objectFit="cover"
-                            mirror={false}
-                        />
+                        <View style={{ flex: 1 }}>
+                            <RTCView
+                                streamURL={remoteStream.toURL()}
+                                style={[styles.fullVideo, { transform: [{ rotate: `${rotation}deg` }] }]}
+                                objectFit="contain"
+                                mirror={false}
+                            />
+                            <TouchableOpacity
+                                style={styles.rotateButton}
+                                onPress={() => setRotation(prev => (prev + 90) % 360)}
+                            >
+                                <Text style={{ fontSize: 20 }}>🔄</Text>
+                            </TouchableOpacity>
+                        </View>
                     ) : (
                         <View style={styles.centered}>
                             <ActivityIndicator size="large" color="#0EA5E9" />
@@ -282,10 +296,16 @@ const ViewerScreen = ({ navigation }: any) => {
                         <View style={styles.playerContainer}>
                             <Video
                                 source={{ uri: selectedVideo }}
-                                style={styles.fullVideo}
+                                style={[styles.fullVideo, { transform: [{ rotate: `${rotation}deg` }] }]}
                                 controls={true}
                                 resizeMode="contain"
                             />
+                            <TouchableOpacity
+                                style={styles.rotateButton}
+                                onPress={() => setRotation(prev => (prev + 90) % 360)}
+                            >
+                                <Text style={{ fontSize: 20 }}>🔄</Text>
+                            </TouchableOpacity>
                             <TouchableOpacity
                                 style={styles.closePlayer}
                                 onPress={() => setSelectedVideo(null)}
@@ -372,6 +392,7 @@ const styles = StyleSheet.create({
     playerContainer: { flex: 1, backgroundColor: '#000' },
     closePlayer: { position: 'absolute', bottom: 40, alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
     closePlayerText: { color: '#FFF', fontWeight: '600' },
+    rotateButton: { position: 'absolute', top: 20, right: 20, backgroundColor: 'rgba(255,255,255,0.3)', padding: 10, borderRadius: 25, zIndex: 100 },
     footer: { padding: 16 },
     backButton: { padding: 16, alignItems: 'center' },
     backButtonText: { color: '#64748B', fontSize: 14, fontWeight: '600' },

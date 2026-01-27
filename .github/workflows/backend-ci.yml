@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 jobs:
   build-and-push:
@@ -33,3 +34,17 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/lyrineye-backend:latest
             ghcr.io/${{ github.repository_owner }}/lyrineye-backend:${{ github.sha }}
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure Container Apps
+        run: |
+          az containerapp update \
+            --name lyrineye-backend \
+            --resource-group lyrineye-dev-rg \
+            --image ghcr.io/${{ github.repository_owner }}/lyrineye-backend:${{ github.sha }}
