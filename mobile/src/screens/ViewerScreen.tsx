@@ -68,8 +68,10 @@ const ViewerScreen = ({ navigation }: any) => {
             const baseUrl = `${CONFIG.SIGNALING_SERVER}/recordings`;
             const url = user ? `${baseUrl}?email=${encodeURIComponent(user.user.email)}` : baseUrl;
 
+            console.log(`[APP] Fetching recordings for ${user.user.email} from ${url}`);
             const response = await fetch(url);
             const data = await response.json();
+            console.log(`[APP] Received ${data.length} recordings`);
             setRecordings(data);
         } catch (error) {
             console.error('Failed to fetch recordings:', error);
@@ -83,9 +85,11 @@ const ViewerScreen = ({ navigation }: any) => {
         if (!user || (!selectedDeviceId && activeTab === 'live')) return;
 
         const targetDevice = selectedDeviceId || 'default-room'; // Fallback if needed
+        targetDeviceRef.current = targetDevice;
         socketRef.current = io(CONFIG.SIGNALING_SERVER);
 
         socketRef.current.on('connect', () => {
+            console.log(`[APP] Connected to signaling, joining room ${targetDevice} as viewer (${user.user.email})`);
             setStatus('Searching for monitor...');
             socketRef.current?.emit('join-room', targetDevice, 'viewer', user.user.email);
         });
@@ -111,6 +115,8 @@ const ViewerScreen = ({ navigation }: any) => {
         });
     };
 
+    const targetDeviceRef = useRef<string | null>(null);
+
     const handleOffer = async (monitorId: string, offer: any) => {
         cleanupWebRTC();
         const pc = new RTCPeerConnection(configuration);
@@ -118,7 +124,7 @@ const ViewerScreen = ({ navigation }: any) => {
 
         (pc as any).onicecandidate = (event: any) => {
             if (event.candidate) {
-                socketRef.current?.emit('ice-candidate', { roomId: 'default-room', candidate: event.candidate, to: monitorId });
+                socketRef.current?.emit('ice-candidate', { roomId: targetDeviceRef.current || 'default-room', candidate: event.candidate, to: monitorId });
             }
         };
 
@@ -133,7 +139,7 @@ const ViewerScreen = ({ navigation }: any) => {
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
-        socketRef.current?.emit('answer', { roomId: 'default-room', answer, to: monitorId });
+        socketRef.current?.emit('answer', { roomId: targetDeviceRef.current || 'default-room', answer, to: monitorId });
     };
 
     const cleanupWebRTC = () => {

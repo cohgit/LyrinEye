@@ -41,9 +41,9 @@ io.on('connection', (socket: Socket) => {
             // Check authorization in UserDevices table
             try {
                 const entity = await userDevicesClient.getEntity(email, roomId);
-                if (!entity) throw new Error('Unauthorized');
+                console.log(`[AUTH] Access GRANTED for ${email} to device ${roomId}`);
             } catch (e) {
-                console.log(`Unauthorized access attempt by ${email} to ${roomId}`);
+                console.log(`[AUTH-DENIED] Unauthorized access attempt by ${email} to device ${roomId}`);
                 return socket.emit('error', 'Unauthorized access');
             }
         }
@@ -186,13 +186,14 @@ app.post('/register-device', async (req, res) => {
         const { deviceId, email } = req.body;
         if (!deviceId || !email) return res.status(400).send({ error: 'deviceId and email are required' });
 
+        console.log(`[REG] Registering device ${deviceId} for user ${email}`);
         await userDevicesClient.upsertEntity({
             partitionKey: email,
             rowKey: deviceId,
             registeredAt: new Date().toISOString()
         });
 
-        res.send({ status: 'registered' });
+        res.send({ status: 'registered', deviceId, email });
     } catch (error: any) {
         res.status(500).send({ error: error.message });
     }
@@ -231,6 +232,7 @@ app.get('/recordings', async (req, res) => {
         // 1. Get all devices for this user (owned or shared)
         const deviceIds: string[] = [];
         if (email) {
+            console.log(`[QUERY] Fetching recordings for user email: ${email}`);
             const deviceEntities = userDevicesClient.listEntities({
                 queryOptions: { filter: `PartitionKey eq '${email}'` }
             });
@@ -238,7 +240,11 @@ app.get('/recordings', async (req, res) => {
                 deviceIds.push(dev.rowKey as string);
             }
 
-            if (deviceIds.length === 0) return res.send([]);
+            console.log(`[QUERY] User ${email} has devices: ${deviceIds.join(', ')}`);
+            if (deviceIds.length === 0) {
+                console.log(`[QUERY] No devices found for user ${email}`);
+                return res.send([]);
+            }
             entities = tableClient.listEntities();
         } else {
             entities = tableClient.listEntities({

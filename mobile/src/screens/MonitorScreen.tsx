@@ -24,6 +24,7 @@ const MonitorScreen = ({ navigation }: any) => {
     // Modes: 'idle' (nothing), 'recording' (VisionCamera + Upload), 'streaming' (WebRTC Loop)
     const [mode, setMode] = useState<'idle' | 'recording' | 'streaming'>('idle');
     const [localStreamUrl, setLocalStreamUrl] = useState<string | null>(null);
+    const [isCameraActive, setIsCameraActive] = useState(false);
 
     // WebRTC Refs
     const socketRef = useRef<Socket | null>(null);
@@ -65,8 +66,10 @@ const MonitorScreen = ({ navigation }: any) => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ deviceId, email: user.user.email })
                     });
-                    AzureLogger.log('Device Registered', { email: user.user.email });
+                    console.log(`[APP] Device ${deviceId} registered for ${user.user.email}`);
+                    AzureLogger.log('Device Registered', { email: user.user.email, deviceId });
                 } catch (e) {
+                    console.error(`[APP] Device Registration Failed: ${e}`);
                     AzureLogger.log('Device Registration Failed', { error: String(e) }, 'WARN');
                 }
             }
@@ -116,6 +119,11 @@ const MonitorScreen = ({ navigation }: any) => {
             AzureLogger.log('Viewer Joined - Switching to Stream', { viewerId });
             setMode('streaming');
             pendingViewers.current.push(viewerId);
+        });
+
+        // Use uniqueId as roomId
+        DeviceInfo.getUniqueId().then(id => {
+            socketRef.current?.emit('join-room', id, 'monitor');
         });
 
         socketRef.current?.on('answer', async ({ from, answer }: any) => {
@@ -180,13 +188,16 @@ const MonitorScreen = ({ navigation }: any) => {
 
         (pc as any).onicecandidate = (event: any) => {
             if (event.candidate) {
-                socketRef.current?.emit('ice-candidate', { roomId: 'default-room', candidate: event.candidate, to: viewerId });
+                DeviceInfo.getUniqueId().then(id => {
+                    socketRef.current?.emit('ice-candidate', { roomId: id, candidate: event.candidate, to: viewerId });
+                });
             }
         };
 
         const offer = await pc.createOffer({});
         await pc.setLocalDescription(offer);
-        socketRef.current?.emit('offer', { roomId: 'default-room', offer, to: viewerId });
+        const deviceId = await DeviceInfo.getUniqueId();
+        socketRef.current?.emit('offer', { roomId: deviceId, offer, to: viewerId });
         AzureLogger.log('Offer Sent', { mode: 'monitor', viewerId });
     };
 
