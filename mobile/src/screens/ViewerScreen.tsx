@@ -89,9 +89,9 @@ const ViewerScreen = ({ navigation }: any) => {
         socketRef.current = io(CONFIG.SIGNALING_SERVER);
 
         socketRef.current.on('connect', () => {
-            console.log(`[APP] Connected to signaling, joining room ${targetDevice} as viewer (${user.user.email})`);
+            console.log(`[APP] Connected to signaling, joining room ${targetDevice} as viewer (${user.email})`);
             setStatus('Searching for monitor...');
-            socketRef.current?.emit('join-room', targetDevice, 'viewer', user.user.email);
+            socketRef.current?.emit('join-room', targetDevice, 'viewer', user.email);
         });
 
         socketRef.current.on('monitor-online', () => {

@@ -35,7 +35,10 @@ class AuthService {
 
     async getCurrentUser() {
         const session = await AsyncStorage.getItem(USER_SESSION_KEY);
-        return session ? JSON.parse(session) : null;
+        if (!session) return null;
+        const userInfo = JSON.parse(session);
+        // Standardize returning the User object
+        return userInfo.data ? userInfo.data : userInfo;
     }
 }
 

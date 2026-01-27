@@ -39,11 +39,12 @@ io.on('connection', (socket: Socket) => {
             if (!email) return socket.emit('error', 'Authentication required');
 
             // Check authorization in UserDevices table
+            const normalizedEmail = email.toLowerCase();
             try {
-                const entity = await userDevicesClient.getEntity(email, roomId);
-                console.log(`[AUTH] Access GRANTED for ${email} to device ${roomId}`);
+                const entity = await userDevicesClient.getEntity(normalizedEmail, roomId);
+                console.log(`[AUTH] Access GRANTED for ${normalizedEmail} to device ${roomId}`);
             } catch (e) {
-                console.log(`[AUTH-DENIED] Unauthorized access attempt by ${email} to device ${roomId}`);
+                console.log(`[AUTH-DENIED] Unauthorized access attempt by ${normalizedEmail} to device ${roomId}`);
                 return socket.emit('error', 'Unauthorized access');
             }
         }
@@ -186,14 +187,15 @@ app.post('/register-device', async (req, res) => {
         const { deviceId, email } = req.body;
         if (!deviceId || !email) return res.status(400).send({ error: 'deviceId and email are required' });
 
-        console.log(`[REG] Registering device ${deviceId} for user ${email}`);
+        const normalizedEmail = email.toLowerCase();
+        console.log(`[REG] Registering device ${deviceId} for user ${normalizedEmail}`);
         await userDevicesClient.upsertEntity({
-            partitionKey: email,
+            partitionKey: normalizedEmail,
             rowKey: deviceId,
             registeredAt: new Date().toISOString()
         });
 
-        res.send({ status: 'registered', deviceId, email });
+        res.send({ status: 'registered', deviceId, email: normalizedEmail });
     } catch (error: any) {
         res.status(500).send({ error: error.message });
     }
@@ -203,14 +205,13 @@ app.post('/register-device', async (req, res) => {
 app.post('/share-device', async (req, res) => {
     try {
         const { deviceId, ownerEmail, shareWithEmail } = req.body;
-
-        // Logical check: Is the requester the owner? 
-        // In a real app we'd check JWT, here for MVP we trust the payload or assume caller verified.
+        const normalizedOwnerEmail = ownerEmail.toLowerCase();
+        const normalizedShareWithEmail = shareWithEmail.toLowerCase();
 
         await userDevicesClient.upsertEntity({
-            partitionKey: shareWithEmail,
+            partitionKey: normalizedShareWithEmail,
             rowKey: deviceId,
-            sharedBy: ownerEmail,
+            sharedBy: normalizedOwnerEmail,
             sharedAt: new Date().toISOString(),
             isShared: true
         });
@@ -232,17 +233,18 @@ app.get('/recordings', async (req, res) => {
         // 1. Get all devices for this user (owned or shared)
         const deviceIds: string[] = [];
         if (email) {
-            console.log(`[QUERY] Fetching recordings for user email: ${email}`);
+            const normalizedEmail = email.toLowerCase();
+            console.log(`[QUERY] Fetching recordings for user email: ${normalizedEmail}`);
             const deviceEntities = userDevicesClient.listEntities({
-                queryOptions: { filter: `PartitionKey eq '${email}'` }
+                queryOptions: { filter: `PartitionKey eq '${normalizedEmail}'` }
             });
             for await (const dev of deviceEntities) {
                 deviceIds.push(dev.rowKey as string);
             }
 
-            console.log(`[QUERY] User ${email} has devices: ${deviceIds.join(', ')}`);
+            console.log(`[QUERY] User ${normalizedEmail} has devices: ${deviceIds.join(', ')}`);
             if (deviceIds.length === 0) {
-                console.log(`[QUERY] No devices found for user ${email}`);
+                console.log(`[QUERY] No devices found for user ${normalizedEmail}`);
                 return res.send([]);
             }
             entities = tableClient.listEntities();
