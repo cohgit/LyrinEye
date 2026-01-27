@@ -9,6 +9,7 @@ class AuthService {
             webClientId: '356025406156-j39p40qrlko37mbff3lb71hjnc4dmmt9.apps.googleusercontent.com',
             offlineAccess: true,
             forceCodeForRefreshToken: true,
+            scopes: ['email', 'profile'],
         });
     }
 
@@ -16,8 +17,15 @@ class AuthService {
         try {
             await GoogleSignin.hasPlayServices();
             const userInfo = await GoogleSignin.signIn();
-            const standardizedUser = userInfo.data ? userInfo.data.user : userInfo.user;
-            await AsyncStorage.setItem(USER_SESSION_KEY, JSON.stringify(standardizedUser));
+
+            // Raw log for debugging email absence
+            console.log('Raw Auth Object:', JSON.stringify(userInfo, null, 2));
+
+            if ('user' in userInfo || (userInfo as any).data) {
+                const standardizedUser = (userInfo as any).data ? (userInfo as any).data.user : (userInfo as any).user;
+                console.log('Standardized User:', JSON.stringify(standardizedUser, null, 2));
+                await AsyncStorage.setItem(USER_SESSION_KEY, JSON.stringify(standardizedUser));
+            }
             return userInfo; // Keep returning original for LoginScreen type check
         } catch (error) {
             console.error('Sign-In Error:', error);
@@ -37,7 +45,18 @@ class AuthService {
     async getCurrentUser() {
         const session = await AsyncStorage.getItem(USER_SESSION_KEY);
         if (!session) return null;
-        return JSON.parse(session); // Now stores the flattened user object
+        let userInfo = JSON.parse(session);
+
+        // Handle legacy wraps: { type: 'success', data: { user: { ... } } }
+        if (userInfo.data && userInfo.data.user) {
+            return userInfo.data.user;
+        }
+        // Handle intermediate wraps: { user: { ... } }
+        if (userInfo.user) {
+            return userInfo.user;
+        }
+
+        return userInfo;
     }
 }
 

@@ -21,7 +21,16 @@ const LoginScreen = ({ navigation }: any) => {
         try {
             const response = await authService.signIn();
             if (response.type === 'success') {
-                AzureLogger.log('User Logged In', { email: response.data.user.email.toLowerCase() });
+                const userEmail = response.data?.user?.email || (response as any).user?.email || 'unknown';
+
+                // Detailed log for debugging visibility
+                AzureLogger.log('User Logged In', {
+                    email: userEmail.toLowerCase(),
+                    rawAuthType: response.type,
+                    hasData: !!response.data,
+                    hasUser: !!(response as any).user
+                });
+
                 navigation.replace('Home');
             }
         } catch (error) {
