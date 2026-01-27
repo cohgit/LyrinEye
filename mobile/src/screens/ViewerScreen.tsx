@@ -66,9 +66,9 @@ const ViewerScreen = ({ navigation }: any) => {
         try {
             const user = await authService.getCurrentUser();
             const baseUrl = `${CONFIG.SIGNALING_SERVER}/recordings`;
-            const url = user ? `${baseUrl}?email=${encodeURIComponent(user.user.email)}` : baseUrl;
+            const url = user ? `${baseUrl}?email=${encodeURIComponent(user.email)}` : baseUrl;
 
-            console.log(`[APP] Fetching recordings for ${user.user.email} from ${url}`);
+            console.log(`[APP] Fetching recordings for ${user?.email} from ${url}`);
             const response = await fetch(url);
             const data = await response.json();
             console.log(`[APP] Received ${data.length} recordings`);
