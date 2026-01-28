@@ -46,7 +46,8 @@ class RecordingUploadService {
             // 1. Upload Thumbnail first if available
             let thumbnailBlobName = '';
             if (thumbnailPath) {
-                thumbnailBlobName = fileName.replace('.mp4', '.jpg');
+                // Remove extension and replace with .jpg for the thumbnail
+                thumbnailBlobName = fileName.replace(/\.[^/.]+$/, "") + '.jpg';
                 await this.uploadFile(thumbnailPath, thumbnailBlobName, 'image/jpeg');
             }
 
@@ -176,7 +177,8 @@ class RecordingUploadService {
 
         let thumbnailBlobName = '';
         if (thumbnailPath && await ReactNativeBlobUtil.fs.exists(thumbnailPath)) {
-            thumbnailBlobName = fileName.replace('.mp4', '.jpg').replace('.mov', '.jpg');
+            // Remove extension and replace with .jpg for the thumbnail
+            thumbnailBlobName = fileName.replace(/\.[^/.]+$/, "") + '.jpg';
             await this.uploadFile(thumbnailPath, thumbnailBlobName, 'image/jpeg');
         }
 

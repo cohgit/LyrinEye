@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, FlatList, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, FlatList, ScrollView, Alert, Image, RefreshControl } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, RTCView } from 'react-native-webrtc';
 import { io, Socket } from 'socket.io-client';
 import Video from 'react-native-video';
@@ -13,6 +14,8 @@ const configuration = {
     ],
 };
 
+const CACHE_KEY = '@lyrineye_recordings_cache';
+
 const ViewerScreen = ({ navigation }: any) => {
     const [remoteStream, setRemoteStream] = useState<any>(null);
     const [status, setStatus] = useState('Connecting...');
@@ -23,6 +26,7 @@ const ViewerScreen = ({ navigation }: any) => {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [selectedHour, setSelectedHour] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [rotation, setRotation] = useState(0);
 
     // ...
@@ -58,12 +62,32 @@ const ViewerScreen = ({ navigation }: any) => {
 
     useEffect(() => {
         connectToSignaling();
-        fetchRecordings();
+        loadCacheAndFetch();
         return () => cleanup();
     }, []);
 
-    const fetchRecordings = async () => {
-        setLoading(true);
+    const loadCacheAndFetch = async () => {
+        await loadCachedRecordings();
+        fetchRecordings(); // Fetch in background
+    };
+
+    const loadCachedRecordings = async () => {
+        try {
+            const cached = await AsyncStorage.getItem(CACHE_KEY);
+            if (cached) {
+                const data = JSON.parse(cached);
+                console.log(`[APP] Loaded ${data.length} recordings from cache`);
+                setRecordings(data);
+            }
+        } catch (error) {
+            console.error('Failed to load cache:', error);
+        }
+    };
+
+    const fetchRecordings = async (isManualRefresh = false) => {
+        if (isManualRefresh) setRefreshing(true);
+        else if (recordings.length === 0) setLoading(true);
+
         try {
             const user = await authService.getCurrentUser();
             const baseUrl = `${CONFIG.SIGNALING_SERVER}/recordings`;
@@ -75,14 +99,16 @@ const ViewerScreen = ({ navigation }: any) => {
             if (Array.isArray(data)) {
                 console.log(`[APP] Received ${data.length} recordings`);
                 setRecordings(data);
+                await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data));
             } else {
                 console.warn(`[APP] Unexpected response format:`, data);
-                setRecordings([]);
+                if (recordings.length === 0) setRecordings([]);
             }
         } catch (error) {
             console.error('Failed to fetch recordings:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
@@ -328,6 +354,10 @@ const ViewerScreen = ({ navigation }: any) => {
                                                 source={{ uri: item.thumbnailUrl }}
                                                 style={styles.thumbnail}
                                                 resizeMode="cover"
+                                                onError={() => {
+                                                    // Handle broken links by clearing the URL locally
+                                                    item.thumbnailUrl = null;
+                                                }}
                                             />
                                         ) : (
                                             <Text style={{ fontSize: 24 }}>🎥</Text>
@@ -342,6 +372,14 @@ const ViewerScreen = ({ navigation }: any) => {
                                 </TouchableOpacity>
                             )}
                             contentContainerStyle={styles.listContent}
+                            refreshControl={
+                                <RefreshControl
+                                    refreshing={refreshing}
+                                    onRefresh={() => fetchRecordings(true)}
+                                    tintColor="#0EA5E9"
+                                    colors={["#0EA5E9"]}
+                                />
+                            }
                             ListEmptyComponent={
                                 <View style={styles.centered}>
                                     <Text style={styles.placeholderText}>No recordings found</Text>
