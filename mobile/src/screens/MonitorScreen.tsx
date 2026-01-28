@@ -58,16 +58,28 @@ const MonitorScreen = ({ navigation }: any) => {
                 if (!status) Alert.alert("Permission required", "Microphone permission is needed for recording.");
             }
 
-            // Request Location Permission for Telemetry
             if (Platform.OS === 'android') {
+                const hasBrightnessPerm = await ScreenBrightness.hasPermission();
+                if (!hasBrightnessPerm) {
+                    Alert.alert(
+                        "Permiso de Brillo",
+                        "LyrinEye necesita permiso para modificar los ajustes del sistema para ahorrar batería.",
+                        [
+                            { text: "Cancelar", style: "cancel" },
+                            { text: "Configurar", onPress: () => ScreenBrightness.requestPermission() }
+                        ]
+                    );
+                }
+
+                // Request Location Permission for Telemetry
                 try {
                     const granted = await PermissionsAndroid.request(
                         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
                         {
-                            title: 'LyrinEye Location Permission',
-                            message: 'LyrinEye needs access to your location for telemetry.',
-                            buttonNeutral: 'Ask Me Later',
-                            buttonNegative: 'Cancel',
+                            title: 'Ubicación',
+                            message: 'LyrinEye usa el GPS para el reporte de telemetría.',
+                            buttonNeutral: 'Después',
+                            buttonNegative: 'Cancelar',
                             buttonPositive: 'OK',
                         }
                     );
@@ -149,6 +161,7 @@ const MonitorScreen = ({ navigation }: any) => {
         if (mode !== 'idle') {
             inactivityTimer.current = setTimeout(() => {
                 setIsScreenLocked(true);
+                // On Android, 0 is full off.
                 ScreenBrightness.setBrightness(0);
                 AzureLogger.log('Screen Auto-Locked due to inactivity');
             }, 30000); // 30 seconds
@@ -463,19 +476,27 @@ const MonitorScreen = ({ navigation }: any) => {
                 </View>
 
                 {/* Lock Overlay */}
-                <TouchableWithoutFeedback onPress={resetInactivityTimer}>
-                    <View style={[
+                <View
+                    style={[
                         StyleSheet.absoluteFill,
-                        { backgroundColor: isScreenLocked ? 'black' : 'transparent', zIndex: 9999 }
-                    ]}>
-                        {isScreenLocked && (
-                            <View style={styles.lockInfo}>
-                                <Text style={styles.lockText}>BLOQUEADO</Text>
-                                <Text style={styles.lockSubtext}>Tocar</Text>
-                            </View>
-                        )}
-                    </View>
-                </TouchableWithoutFeedback>
+                        {
+                            backgroundColor: isScreenLocked ? 'black' : 'transparent',
+                            zIndex: isScreenLocked ? 9999 : -1
+                        }
+                    ]}
+                    pointerEvents={isScreenLocked ? 'auto' : 'none'}
+                >
+                    <TouchableWithoutFeedback onPress={resetInactivityTimer}>
+                        <View style={styles.lockInfo}>
+                            {isScreenLocked && (
+                                <>
+                                    <Text style={styles.lockText}>BLOQUEADO</Text>
+                                    <Text style={styles.lockSubtext}>Tocar</Text>
+                                </>
+                            )}
+                        </View>
+                    </TouchableWithoutFeedback>
+                </View>
             </View>
 
             <Modal

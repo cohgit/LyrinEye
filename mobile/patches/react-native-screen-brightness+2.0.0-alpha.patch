@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-screen-brightness/android/build.gradle b/node_modules/react-native-screen-brightness/android/build.gradle
+index 97e0d44..b91c9e7 100644
+--- a/node_modules/react-native-screen-brightness/android/build.gradle
++++ b/node_modules/react-native-screen-brightness/android/build.gradle
+@@ -1,6 +1,7 @@
+ buildscript {
+     repositories {
+-        jcenter()
++        google()
++        mavenCentral()
+     }
+ 
+     dependencies {
