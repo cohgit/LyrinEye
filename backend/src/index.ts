@@ -28,6 +28,29 @@ const blobServiceClient = BlobServiceClient.fromConnectionString(CONNECTION_STRI
 const tableClient = TableClient.fromConnectionString(CONNECTION_STRING, 'camerametadata');
 const userDevicesClient = TableClient.fromConnectionString(CONNECTION_STRING, 'userdevices');
 
+// Ensure resources exist
+async function initStorage() {
+    try {
+        console.log('Initializing Azure Storage resources...');
+        const recordingsContainer = blobServiceClient.getContainerClient('recordings');
+        await recordingsContainer.createIfNotExists();
+
+        await tableClient.createTable().catch((e: any) => {
+            if (e.statusCode !== 409) throw e; // 409 means table already exists
+        });
+
+        await userDevicesClient.createTable().catch((e: any) => {
+            if (e.statusCode !== 409) throw e;
+        });
+
+        console.log('Azure Storage resources ready.');
+    } catch (error) {
+        console.error('Failed to initialize Azure Storage:', error);
+    }
+}
+
+initStorage();
+
 // WebRTC Rooms
 const rooms = new Map<string, { monitor?: string, viewers: string[] }>();
 

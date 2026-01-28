@@ -233,8 +233,7 @@ const MonitorScreen = ({ navigation }: any) => {
                     AzureLogger.log('Recording Finished', { path: video.path });
 
                     // Upload in background with snapshot
-                    RecordingUploader.uploadRecording(video.path, video.duration, snapshotPath)
-                        .catch(e => AzureLogger.log('Upload Failed', { error: String(e) }, 'ERROR'));
+                    RecordingUploader.uploadRecording(video.path, video.duration, snapshotPath);
 
                     // Start next chunk immediately if still in recording mode
                     if (mode === 'recording') {
@@ -325,17 +324,20 @@ const MonitorScreen = ({ navigation }: any) => {
 
     return (
         <SafeAreaView style={styles.container}>
+            <KeepAwake />
             <View style={styles.cameraContainer}>
                 {device && (mode === 'recording' || mode === 'idle') ? (
                     <Camera
-                        ref={camera}
-                        style={StyleSheet.absoluteFill}
-                        device={device}
-                        isActive={true}
-                        video={true}
-                        audio={true}
-                        photo={true}
-                        orientation={orientation}
+                        {...({
+                            ref: camera,
+                            style: StyleSheet.absoluteFill,
+                            device: device,
+                            isActive: true,
+                            video: true,
+                            audio: true,
+                            photo: true,
+                            orientation: orientation
+                        } as any)}
                     />
                 ) : mode === 'streaming' && localStreamUrl ? (
                     <RTCView

@@ -57,6 +57,11 @@ resource "azurerm_storage_table" "metadata" {
   storage_account_name = azurerm_storage_account.main.name
 }
 
+resource "azurerm_storage_table" "userdevices" {
+  name                 = "userdevices"
+  storage_account_name = azurerm_storage_account.main.name
+}
+
 resource "azurerm_storage_container" "recordings" {
   name                  = "recordings"
   storage_account_name  = azurerm_storage_account.main.name
