@@ -7,7 +7,7 @@ const HomeScreen = ({ navigation }: any) => {
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
         <Text style={styles.title}>LyrinEye</Text>
-        <Text style={styles.subtitle}>Smart Surveillance System</Text>
+        <Text style={styles.subtitle}>Seguridad</Text>
       </View>
 
       <View style={styles.cardContainer}>
@@ -16,8 +16,8 @@ const HomeScreen = ({ navigation }: any) => {
           onPress={() => navigation.navigate('Monitor')}
         >
           <Text style={styles.cardEmoji}>📹</Text>
-          <Text style={styles.cardTitle}>Monitor Mode</Text>
-          <Text style={styles.cardDescription}>Use this device as a security camera.</Text>
+          <Text style={styles.cardTitle}>Monitor</Text>
+          <Text style={styles.cardDescription}>Trasmitir y grabar</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -25,8 +25,8 @@ const HomeScreen = ({ navigation }: any) => {
           onPress={() => navigation.navigate('Viewer')}
         >
           <Text style={styles.cardEmoji}>📱</Text>
-          <Text style={styles.cardTitle}>Viewer Mode</Text>
-          <Text style={styles.cardDescription}>Watch your live streams and recordings.</Text>
+          <Text style={styles.cardTitle}>Galería</Text>
+          <Text style={styles.cardDescription}>Ver en vivo y grabaciones</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -36,7 +36,7 @@ const HomeScreen = ({ navigation }: any) => {
             navigation.replace('Login');
           }}
         >
-          <Text style={styles.logoutButtonText}>Sign Out</Text>
+          <Text style={styles.logoutButtonText}>Salir</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -49,14 +49,14 @@ const LoginScreen = ({ navigation }: any) => {
                         style={styles.logo}
                     />
                     <Text style={styles.title}>LyrinEye</Text>
-                    <Text style={styles.subtitle}>Securing your space, using your past.</Text>
+                    <Text style={styles.subtitle}>Seguridad inteligente</Text>
                 </View>
 
                 {loading ? (
                     <ActivityIndicator size="large" color="#0EA5E9" />
                 ) : (
                     <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
-                        <Text style={styles.loginButtonText}>Sign in with Google</Text>
+                        <Text style={styles.loginButtonText}>Ingresar con Google</Text>
                     </TouchableOpacity>
                 )}
             </View>

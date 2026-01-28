@@ -16,9 +16,36 @@ const configuration = {
 
 const CACHE_KEY = '@lyrineye_recordings_cache';
 
+const ThumbnailCycle = ({ primaryUrl }: { primaryUrl: string }) => {
+    const [index, setIndex] = React.useState(0);
+    const framesCount = 6;
+
+    React.useEffect(() => {
+        // If it's a legacy URL (doesn't have _0), don't cycle or handle carefully
+        if (!primaryUrl.includes('_0.jpg')) return;
+
+        const interval = setInterval(() => {
+            setIndex(prev => (prev + 1) % framesCount);
+        }, 1200); // 1.2s per frame
+        return () => clearInterval(interval);
+    }, [primaryUrl]);
+
+    const getFrameUrl = (idx: number) => {
+        return primaryUrl.replace('_0.jpg', `_${idx}.jpg`);
+    };
+
+    return (
+        <Image
+            source={{ uri: getFrameUrl(index) }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+        />
+    );
+};
+
 const ViewerScreen = ({ navigation }: any) => {
     const [remoteStream, setRemoteStream] = useState<any>(null);
-    const [status, setStatus] = useState('Connecting...');
+    const [status, setStatus] = useState('Conectando...');
     const [recordings, setRecordings] = useState<any[]>([]);
     const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'live' | 'recordings'>('recordings');
@@ -34,16 +61,16 @@ const ViewerScreen = ({ navigation }: any) => {
     const handleTabChange = (tab: 'live' | 'recordings') => {
         if (tab === 'live') {
             if (!selectedDeviceId) {
-                Alert.alert("Select a Device", "Please select a device from the filter above to watch live feed.");
+                Alert.alert("Seleccionar equipo", "Elige un equipo para ver en vivo.");
                 return;
             }
             Alert.alert(
-                "Stop Recording?",
-                "Viewing the live stream will pause recording on the Monitor device. Continue?",
+                "¿Pausar grabación?",
+                "Ver en vivo pausará la grabación actual. ¿Continuar?",
                 [
-                    { text: "Cancel", style: "cancel" },
+                    { text: "No", style: "cancel" },
                     {
-                        text: "Continue", onPress: () => {
+                        text: "Sí", onPress: () => {
                             setActiveTab('live');
                             connectToSignaling();
                         }
@@ -100,6 +127,16 @@ const ViewerScreen = ({ navigation }: any) => {
                 console.log(`[APP] Received ${data.length} recordings`);
                 setRecordings(data);
                 await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data));
+
+                // Default to latest date and hour if not set
+                if (data.length > 0 && !selectedDate && !selectedHour) {
+                    const sorted = [...data].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                    const latest = sorted[0];
+                    const dateObj = new Date(latest.timestamp);
+                    setSelectedDate(dateObj.toLocaleDateString());
+                    setSelectedHour(dateObj.getHours().toString());
+                    console.log(`[APP] Auto-filtered to latest: ${dateObj.toLocaleDateString()} ${dateObj.getHours()}:00`);
+                }
             } else {
                 console.warn(`[APP] Unexpected response format:`, data);
                 if (recordings.length === 0) setRecordings([]);
@@ -122,12 +159,12 @@ const ViewerScreen = ({ navigation }: any) => {
 
         socketRef.current.on('connect', () => {
             console.log(`[APP] Connected to signaling, joining room ${targetDevice} as viewer (${user.email})`);
-            setStatus('Searching for monitor...');
+            setStatus('Buscando...');
             socketRef.current?.emit('join-room', targetDevice, 'viewer', user.email);
         });
 
         socketRef.current.on('monitor-online', () => {
-            setStatus('Waiting for video feed...');
+            setStatus('Esperando...');
         });
 
         socketRef.current.on('offer', async ({ from, offer }: any) => {
@@ -141,7 +178,7 @@ const ViewerScreen = ({ navigation }: any) => {
         });
 
         socketRef.current.on('monitor-offline', () => {
-            setStatus('Monitor disconnected');
+            setStatus('Desconectado');
             setRemoteStream(null);
             cleanupWebRTC();
         });
@@ -163,7 +200,7 @@ const ViewerScreen = ({ navigation }: any) => {
         (pc as any).ontrack = (event: any) => {
             if (event.streams && event.streams[0]) {
                 setRemoteStream(event.streams[0]);
-                setStatus('LIVE');
+                setStatus('VIVO');
             }
         };
 
@@ -200,6 +237,20 @@ const ViewerScreen = ({ navigation }: any) => {
             .sort((a, b) => a - b)
         : [];
 
+    const skipToNext = () => {
+        const currentIndex = filteredRecordings.findIndex(r => r.url === selectedVideo);
+        if (currentIndex < filteredRecordings.length - 1) {
+            setSelectedVideo(filteredRecordings[currentIndex + 1].url);
+        }
+    };
+
+    const skipToPrev = () => {
+        const currentIndex = filteredRecordings.findIndex(r => r.url === selectedVideo);
+        if (currentIndex > 0) {
+            setSelectedVideo(filteredRecordings[currentIndex - 1].url);
+        }
+    };
+
     const filteredRecordings = recordings
         .filter(r => {
             const date = new Date(r.timestamp);
@@ -218,13 +269,13 @@ const ViewerScreen = ({ navigation }: any) => {
                     style={[styles.tab, activeTab === 'live' && styles.activeTab]}
                     onPress={() => handleTabChange('live')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'live' && styles.activeTabText]}>LIVE FEED</Text>
+                    <Text style={[styles.tabText, activeTab === 'live' && styles.activeTabText]}>EN VIVO</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'recordings' && styles.activeTab]}
                     onPress={() => handleTabChange('recordings')}
                 >
-                    <Text style={[styles.tabText, activeTab === 'recordings' && styles.activeTabText]}>RECORDINGS</Text>
+                    <Text style={[styles.tabText, activeTab === 'recordings' && styles.activeTabText]}>GALERÍA</Text>
                 </TouchableOpacity>
             </View>
 
@@ -263,7 +314,7 @@ const ViewerScreen = ({ navigation }: any) => {
                                     style={[styles.filterChip, !selectedDeviceId && styles.activeFilter]}
                                     onPress={() => setSelectedDeviceId(null)}
                                 >
-                                    <Text style={[styles.filterText, !selectedDeviceId && styles.activeFilterText]}>All Devices</Text>
+                                    <Text style={[styles.filterText, !selectedDeviceId && styles.activeFilterText]}>Todos</Text>
                                 </TouchableOpacity>
                                 {uniqueDevices.map(id => (
                                     <TouchableOpacity
@@ -282,7 +333,7 @@ const ViewerScreen = ({ navigation }: any) => {
                                     style={[styles.filterChip, !selectedDate && styles.activeFilter]}
                                     onPress={() => { setSelectedDate(null); setSelectedHour(null); }}
                                 >
-                                    <Text style={[styles.filterText, !selectedDate && styles.activeFilterText]}>All Dates</Text>
+                                    <Text style={[styles.filterText, !selectedDate && styles.activeFilterText]}>Todas</Text>
                                 </TouchableOpacity>
                                 {uniqueDates.map(date => (
                                     <TouchableOpacity
@@ -302,7 +353,7 @@ const ViewerScreen = ({ navigation }: any) => {
                                         style={[styles.filterChip, selectedHour === null && styles.activeFilter]}
                                         onPress={() => setSelectedHour(null)}
                                     >
-                                        <Text style={[styles.filterText, selectedHour === null && styles.activeFilterText]}>All Hours</Text>
+                                        <Text style={[styles.filterText, selectedHour === null && styles.activeFilterText]}>Todas</Text>
                                     </TouchableOpacity>
                                     {uniqueHours.map(hour => (
                                         <TouchableOpacity
@@ -326,17 +377,37 @@ const ViewerScreen = ({ navigation }: any) => {
                                 controls={true}
                                 resizeMode="contain"
                             />
+
+                            {/* Player Overlays */}
                             <TouchableOpacity
                                 style={styles.rotateButton}
                                 onPress={() => setRotation(prev => (prev + 90) % 360)}
                             >
                                 <Text style={{ fontSize: 20 }}>🔄</Text>
                             </TouchableOpacity>
+
+                            <View style={styles.skipControls}>
+                                <TouchableOpacity
+                                    style={[styles.skipButton, filteredRecordings.findIndex(r => r.url === selectedVideo) >= filteredRecordings.length - 1 && styles.disabledSkip]}
+                                    onPress={skipToPrev}
+                                    disabled={filteredRecordings.findIndex(r => r.url === selectedVideo) >= filteredRecordings.length - 1}
+                                >
+                                    <Text style={styles.skipText}>⏮️ Ant</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.skipButton, filteredRecordings.findIndex(r => r.url === selectedVideo) <= 0 && styles.disabledSkip]}
+                                    onPress={skipToNext}
+                                    disabled={filteredRecordings.findIndex(r => r.url === selectedVideo) <= 0}
+                                >
+                                    <Text style={styles.skipText}>Sig ⏭️</Text>
+                                </TouchableOpacity>
+                            </View>
+
                             <TouchableOpacity
                                 style={styles.closePlayer}
                                 onPress={() => setSelectedVideo(null)}
                             >
-                                <Text style={styles.closePlayerText}>Close Player</Text>
+                                <Text style={styles.closePlayerText}>Cerrar</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (
@@ -350,15 +421,18 @@ const ViewerScreen = ({ navigation }: any) => {
                                 >
                                     <View style={styles.recordingIcon}>
                                         {item.thumbnailUrl ? (
-                                            <Image
-                                                source={{ uri: item.thumbnailUrl }}
-                                                style={styles.thumbnail}
-                                                resizeMode="cover"
-                                                onError={() => {
-                                                    // Handle broken links by clearing the URL locally
-                                                    item.thumbnailUrl = null;
-                                                }}
-                                            />
+                                            item.thumbnailUrl.includes('_0.jpg') ? (
+                                                <ThumbnailCycle primaryUrl={item.thumbnailUrl} />
+                                            ) : (
+                                                <Image
+                                                    source={{ uri: item.thumbnailUrl }}
+                                                    style={styles.thumbnail}
+                                                    resizeMode="cover"
+                                                    onError={() => {
+                                                        item.thumbnailUrl = null;
+                                                    }}
+                                                />
+                                            )
                                         ) : (
                                             <Text style={{ fontSize: 24 }}>🎥</Text>
                                         )}
@@ -382,7 +456,7 @@ const ViewerScreen = ({ navigation }: any) => {
                             }
                             ListEmptyComponent={
                                 <View style={styles.centered}>
-                                    <Text style={styles.placeholderText}>No recordings found</Text>
+                                    <Text style={styles.placeholderText}>Sin grabaciones</Text>
                                 </View>
                             }
                         />
@@ -402,7 +476,7 @@ const ViewerScreen = ({ navigation }: any) => {
                     }}
                 >
                     <Text style={styles.backButtonText}>
-                        {selectedVideo ? "Close Player" : "Return to Home"}
+                        {selectedVideo ? "Cerrar" : "Volver"}
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -441,6 +515,32 @@ const styles = StyleSheet.create({
     filterText: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
     activeFilterText: { color: '#FFF' },
     thumbnail: { width: '100%', height: '100%', borderRadius: 12 },
+    skipControls: {
+        position: 'absolute',
+        top: '50%',
+        left: 0,
+        right: 0,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        marginTop: -30,
+    },
+    skipButton: {
+        backgroundColor: 'rgba(30, 41, 59, 0.7)',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    disabledSkip: {
+        opacity: 0.3,
+    },
+    skipText: {
+        color: '#FFF',
+        fontWeight: '700',
+        fontSize: 14,
+    },
 });
 
 export default ViewerScreen;

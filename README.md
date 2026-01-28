@@ -13,8 +13,8 @@ LyrinEye is a mobile-first security solution designed to leverage cloud "forever
 
 ## 🛠 Tech Stack
 - **Infrastructure:** Terraform (Azure Provider).
-- **Backend:** Node.js/Go (to be defined) in Container Apps.
-- **Mobile:** Android (Kotlin/Native or React Native - TBD).
+- **Backend:** Node.js (Express + Socket.io) in Azure Container Apps.
+- **Mobile:** React Native (TypeScript) with Vision Camera and WebRTC.
 
 ## 🔒 Security & Public Repository Guidelines
 

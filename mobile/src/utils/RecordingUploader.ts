@@ -36,19 +36,25 @@ class RecordingUploadService {
         });
     }
 
-    async uploadRecording(filePath: string, durationSec: number, thumbnailPath?: string) {
+    async uploadRecording(filePath: string, durationSec: number, thumbnailPaths?: string | string[]) {
         try {
             const fileName = filePath.split('/').pop();
             if (!fileName) throw new Error("Invalid file path");
 
             AzureLogger.log('Starting Upload Strategy', { fileName });
 
-            // 1. Upload Thumbnail first if available
+            // 1. Upload Thumbnails first if available
             let thumbnailBlobName = '';
-            if (thumbnailPath) {
-                // Remove extension and replace with .jpg for the thumbnail
-                thumbnailBlobName = fileName.replace(/\.[^/.]+$/, "") + '.jpg';
-                await this.uploadFile(thumbnailPath, thumbnailBlobName, 'image/jpeg');
+            if (thumbnailPaths) {
+                const paths = Array.isArray(thumbnailPaths) ? thumbnailPaths : [thumbnailPaths];
+                for (let i = 0; i < paths.length; i++) {
+                    const path = paths[i];
+                    // Name frames as _0.jpg, _1.jpg... if multiple
+                    const suffix = paths.length > 1 ? `_${i}` : '';
+                    const thumbName = fileName.replace(/\.[^/.]+$/, "") + suffix + '.jpg';
+                    await this.uploadFile(path, thumbName, 'image/jpeg');
+                    if (i === 0) thumbnailBlobName = thumbName; // Primary thumbnail
+                }
             }
 
             // 2. Get SAS Token and Upload Video
@@ -85,12 +91,12 @@ class RecordingUploadService {
             return true;
         } catch (error) {
             AzureLogger.log('Upload Failed - Queueing locally', { error: String(error) }, 'WARN');
-            await this.enqueueFailedUpload(filePath, durationSec, thumbnailPath);
+            await this.enqueueFailedUpload(filePath, durationSec, thumbnailPaths);
             return false;
         }
     }
 
-    private async enqueueFailedUpload(filePath: string, durationSec: number, thumbnailPath?: string) {
+    private async enqueueFailedUpload(filePath: string, durationSec: number, thumbnailPaths?: string | string[]) {
         try {
             const fileName = filePath.split('/').pop()!;
             const persistentPath = `${PENDING_DIR}/${fileName}`;
@@ -98,18 +104,22 @@ class RecordingUploadService {
             // Move file to persistent storage
             await ReactNativeBlobUtil.fs.cp(filePath, persistentPath);
 
-            let persistentThumbPath = '';
-            if (thumbnailPath) {
-                const thumbName = thumbnailPath.split('/').pop()!;
-                persistentThumbPath = `${PENDING_DIR}/${thumbName}`;
-                await ReactNativeBlobUtil.fs.cp(thumbnailPath, persistentThumbPath);
+            let persistentThumbPaths: string[] = [];
+            if (thumbnailPaths) {
+                const paths = Array.isArray(thumbnailPaths) ? thumbnailPaths : [thumbnailPaths];
+                for (const tp of paths) {
+                    const thumbName = tp.split('/').pop()!;
+                    const ptp = `${PENDING_DIR}/${thumbName}`;
+                    await ReactNativeBlobUtil.fs.cp(tp, ptp);
+                    persistentThumbPaths.push(ptp);
+                }
             }
 
             const pending = await this.getPendingQueue();
             pending.push({
                 filePath: persistentPath,
                 durationSec,
-                thumbnailPath: persistentThumbPath,
+                thumbnailPaths: persistentThumbPaths,
                 timestamp: new Date().toISOString()
             });
 
@@ -118,7 +128,8 @@ class RecordingUploadService {
                 const removed = pending.shift();
                 if (removed) {
                     await ReactNativeBlobUtil.fs.unlink(removed.filePath);
-                    if (removed.thumbnailPath) await ReactNativeBlobUtil.fs.unlink(removed.thumbnailPath);
+                    const tps = removed.thumbnailPaths || (removed.thumbnailPath ? [removed.thumbnailPath] : []);
+                    for (const tp of tps) await ReactNativeBlobUtil.fs.unlink(tp);
                 }
             }
 
@@ -155,7 +166,8 @@ class RecordingUploadService {
                     if (success) {
                         // Clean up persistent files
                         await ReactNativeBlobUtil.fs.unlink(item.filePath);
-                        if (item.thumbnailPath) await ReactNativeBlobUtil.fs.unlink(item.thumbnailPath);
+                        const tps = item.thumbnailPaths || (item.thumbnailPath ? [item.thumbnailPath] : []);
+                        for (const tp of tps) await ReactNativeBlobUtil.fs.unlink(tp);
                         continue;
                     }
                 }
@@ -171,15 +183,22 @@ class RecordingUploadService {
         console.log(`[UPLOAD] Queue processing finished. ${remaining.length} items left.`);
     }
 
-    private async performUpload(filePath: string, durationSec: number, thumbnailPath?: string) {
+    private async performUpload(filePath: string, durationSec: number, thumbnailPaths?: string | string[]) {
         // Redo the logic from uploadRecording but without re-queueing on failure
         const fileName = filePath.split('/').pop()!;
 
         let thumbnailBlobName = '';
-        if (thumbnailPath && await ReactNativeBlobUtil.fs.exists(thumbnailPath)) {
-            // Remove extension and replace with .jpg for the thumbnail
-            thumbnailBlobName = fileName.replace(/\.[^/.]+$/, "") + '.jpg';
-            await this.uploadFile(thumbnailPath, thumbnailBlobName, 'image/jpeg');
+        if (thumbnailPaths) {
+            const paths = Array.isArray(thumbnailPaths) ? thumbnailPaths : [thumbnailPaths];
+            for (let i = 0; i < paths.length; i++) {
+                const path = paths[i];
+                if (await ReactNativeBlobUtil.fs.exists(path)) {
+                    const suffix = paths.length > 1 ? `_${i}` : '';
+                    const thumbName = fileName.replace(/\.[^/.]+$/, "") + suffix + '.jpg';
+                    await this.uploadFile(path, thumbName, 'image/jpeg');
+                    if (i === 0) thumbnailBlobName = thumbName;
+                }
+            }
         }
 
         const sasUrl = `${CONFIG.SIGNALING_SERVER}/sas?blobName=${fileName}`;

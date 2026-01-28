@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, AppState, Modal, TextInput, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, AppState, Modal, TextInput, Dimensions, PermissionsAndroid, Platform, TouchableWithoutFeedback } from 'react-native';
 import { RTCPeerConnection, RTCIceCandidate, RTCSessionDescription, mediaDevices, RTCView } from 'react-native-webrtc';
 import DeviceInfo from 'react-native-device-info';
 import { Camera, useCameraDevice, useCameraPermission, useMicrophonePermission, Orientation } from 'react-native-vision-camera';
@@ -10,8 +10,9 @@ import { RecordingUploader } from '../utils/RecordingUploader';
 import { authService } from '../utils/AuthService';
 import { Telemetry } from '../utils/TelemetryService';
 import KeepAwake from 'react-native-keep-awake';
+import ScreenBrightness from 'react-native-screen-brightness';
 
-const RECORDING_DURATION_MS = 15000; // 15 seconds per chunk
+const RECORDING_DURATION_MS = 60000; // 1 minute per chunk
 
 const configuration = {
     iceServers: [
@@ -26,6 +27,9 @@ const MonitorScreen = ({ navigation }: any) => {
     const [localStreamUrl, setLocalStreamUrl] = useState<string | null>(null);
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [orientation, setOrientation] = useState<Orientation>('portrait');
+    const initialBrightness = useRef<number>(1.0);
+    const [isScreenLocked, setIsScreenLocked] = useState(false);
+    const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // WebRTC Refs
     const socketRef = useRef<Socket | null>(null);
@@ -39,6 +43,8 @@ const MonitorScreen = ({ navigation }: any) => {
     const camera = useRef<Camera>(null);
     const isRecordingRef = useRef(false);
     const recordingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const snapshotInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+    const currentSnapshots = useRef<string[]>([]);
 
     // Initial Permissions & Setup
     useEffect(() => {
@@ -50,6 +56,27 @@ const MonitorScreen = ({ navigation }: any) => {
             if (!hasMicPermission) {
                 const status = await requestMicPermission();
                 if (!status) Alert.alert("Permission required", "Microphone permission is needed for recording.");
+            }
+
+            // Request Location Permission for Telemetry
+            if (Platform.OS === 'android') {
+                try {
+                    const granted = await PermissionsAndroid.request(
+                        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+                        {
+                            title: 'LyrinEye Location Permission',
+                            message: 'LyrinEye needs access to your location for telemetry.',
+                            buttonNeutral: 'Ask Me Later',
+                            buttonNegative: 'Cancel',
+                            buttonPositive: 'OK',
+                        }
+                    );
+                    if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+                        console.log('[MONITOR] Location permission denied');
+                    }
+                } catch (err) {
+                    console.warn(err);
+                }
             }
         })();
 
@@ -88,6 +115,11 @@ const MonitorScreen = ({ navigation }: any) => {
         const dimSubscription = Dimensions.addEventListener('change', updateOrientation);
         updateOrientation();
 
+        // Initialize Brightness
+        ScreenBrightness.getBrightness().then(value => {
+            initialBrightness.current = value;
+        });
+
         // App State Logging
         const subscription = AppState.addEventListener('change', nextAppState => {
             AzureLogger.log('App State Changed', { state: nextAppState });
@@ -98,26 +130,53 @@ const MonitorScreen = ({ navigation }: any) => {
             dimSubscription.remove();
             Telemetry.stop();
             cleanupEverything();
+            // Restore brightness on unmount
+            ScreenBrightness.setBrightness(initialBrightness.current);
         };
     }, []);
 
-    // Mode Handling
+    const resetInactivityTimer = useCallback(() => {
+        if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+
+        // Wake up screen if it was locked
+        if (isScreenLocked) {
+            setIsScreenLocked(false);
+            ScreenBrightness.setBrightness(initialBrightness.current);
+            AzureLogger.log('Screen Waked Up');
+        }
+
+        // Only auto-lock if in an active mode
+        if (mode !== 'idle') {
+            inactivityTimer.current = setTimeout(() => {
+                setIsScreenLocked(true);
+                ScreenBrightness.setBrightness(0);
+                AzureLogger.log('Screen Auto-Locked due to inactivity');
+            }, 30000); // 30 seconds
+        }
+    }, [mode, isScreenLocked]);
+
     useEffect(() => {
         AzureLogger.log('Mode Changed', { mode });
 
         if (mode === 'recording') {
             // Give camera a moment to mount
             setTimeout(() => startRecordingChunk(), 1000);
+            resetInactivityTimer();
         } else if (mode === 'streaming') {
             startWebRTC();
+            resetInactivityTimer();
         } else {
-            // Idle: Cleanup strictly done via cleanupEverything usually
+            // Restore
+            if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+            setIsScreenLocked(false);
+            ScreenBrightness.setBrightness(initialBrightness.current);
         }
 
         return () => {
             // Cleanup when leaving mode
             if (mode === 'recording') stopRecordingLoop();
             if (mode === 'streaming') stopWebRTC();
+            if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
         };
     }, [mode]);
 
@@ -220,20 +279,44 @@ const MonitorScreen = ({ navigation }: any) => {
         try {
             if (isRecordingRef.current) return;
 
-            // Take matching snapshot for this chunk
-            const photo = await camera.current.takePhoto({ flash: 'off' });
-            const snapshotPath = photo.path;
+            // Prepare for multi-frame snapshots
+            currentSnapshots.current = [];
+            const takeSnapshot = async () => {
+                if (camera.current && isRecordingRef.current) {
+                    try {
+                        const photo = await camera.current.takePhoto({ flash: 'off' });
+                        currentSnapshots.current.push(photo.path);
+                        console.log(`[APP] Captured snapshot ${currentSnapshots.current.length}/6`);
+                    } catch (e) {
+                        console.warn('[APP] Snapshot failed during recording', e);
+                    }
+                }
+            };
 
-            AzureLogger.log('Starting Recording Chunk with Snapshot');
+            // First snapshot immediately
+            await takeSnapshot();
+
+            AzureLogger.log('Starting 1m Recording Chunk');
             isRecordingRef.current = true;
+
+            // Start interval for remaining 5 snapshots (every 10s)
+            snapshotInterval.current = setInterval(() => {
+                if (currentSnapshots.current.length < 6) {
+                    takeSnapshot();
+                } else {
+                    if (snapshotInterval.current) clearInterval(snapshotInterval.current);
+                }
+            }, 10000);
 
             camera.current.startRecording({
                 onRecordingFinished: async (video) => {
                     isRecordingRef.current = false;
-                    AzureLogger.log('Recording Finished', { path: video.path });
+                    if (snapshotInterval.current) clearInterval(snapshotInterval.current);
 
-                    // Upload in background with snapshot
-                    RecordingUploader.uploadRecording(video.path, video.duration, snapshotPath);
+                    AzureLogger.log('Recording Finished', { path: video.path, snapshots: currentSnapshots.current.length });
+
+                    // Upload in background with all snapshots
+                    RecordingUploader.uploadRecording(video.path, video.duration, currentSnapshots.current);
 
                     // Start next chunk immediately if still in recording mode
                     if (mode === 'recording') {
@@ -242,13 +325,14 @@ const MonitorScreen = ({ navigation }: any) => {
                 },
                 onRecordingError: (error) => {
                     isRecordingRef.current = false;
+                    if (snapshotInterval.current) clearInterval(snapshotInterval.current);
                     AzureLogger.log('Recording Error', { error: JSON.stringify(error) }, 'ERROR');
                     // Retry?
                     if (mode === 'recording') setTimeout(startRecordingChunk, 2000);
                 }
             });
 
-            // Stop after duration
+            // Stop after duration (60s)
             recordingTimer.current = setTimeout(async () => {
                 if (camera.current && isRecordingRef.current) {
                     await camera.current.stopRecording();
@@ -258,11 +342,13 @@ const MonitorScreen = ({ navigation }: any) => {
         } catch (e) {
             console.error(e);
             isRecordingRef.current = false;
+            if (snapshotInterval.current) clearInterval(snapshotInterval.current);
         }
     };
 
     const stopRecordingLoop = async () => {
         if (recordingTimer.current) clearTimeout(recordingTimer.current);
+        if (snapshotInterval.current) clearInterval(snapshotInterval.current);
         if (camera.current && isRecordingRef.current) {
             await camera.current.stopRecording();
         }
@@ -309,14 +395,14 @@ const MonitorScreen = ({ navigation }: any) => {
                 })
             });
             if (response.ok) {
-                Alert.alert("Success", `Monitor shared with ${shareEmail}`);
+                Alert.alert("Éxito", `Compartido con ${shareEmail}`);
                 setShowShareModal(false);
                 setShareEmail('');
             } else {
                 throw new Error("Failed to share");
             }
         } catch (error) {
-            Alert.alert("Error", "Could not share monitor. Please try again.");
+            Alert.alert("Error", "No se pudo compartir.");
         } finally {
             setIsSharing(false);
         }
@@ -348,18 +434,18 @@ const MonitorScreen = ({ navigation }: any) => {
                 ) : (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color="#0ea5e9" />
-                        <Text style={styles.loadingText}>Initializing Camera...</Text>
+                        <Text style={styles.loadingText}>Iniciando...</Text>
                     </View>
                 )}
 
                 {/* Overlays */}
-                <View style={styles.overlay}>
+                <View style={[styles.overlay, orientation.includes('landscape') && { padding: 12 }]}>
                     <View style={styles.header}>
                         <View>
-                            <Text style={styles.title}>Monitor Active</Text>
+                            <Text style={styles.title}>Monitor</Text>
                             <Text style={styles.status}>
-                                {mode === 'streaming' ? 'SHARING LIVE FEED 🔴' :
-                                    mode === 'recording' ? 'RECORDING CHUNKS 📹' : 'IDLE ⚪'}
+                                {mode === 'streaming' ? 'VIVO 🔴' :
+                                    mode === 'recording' ? 'REC 📹' : 'LISTO ⚪'}
                             </Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -370,11 +456,26 @@ const MonitorScreen = ({ navigation }: any) => {
                                 <Text style={{ fontSize: 20 }}>👥</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.stopButton} onPress={toggleWork}>
-                                <Text style={styles.stopButtonText}>{mode === 'idle' ? 'START' : 'STOP'}</Text>
+                                <Text style={styles.stopButtonText}>{mode === 'idle' ? 'INICIAR' : 'PARAR'}</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
                 </View>
+
+                {/* Lock Overlay */}
+                <TouchableWithoutFeedback onPress={resetInactivityTimer}>
+                    <View style={[
+                        StyleSheet.absoluteFill,
+                        { backgroundColor: isScreenLocked ? 'black' : 'transparent', zIndex: 9999 }
+                    ]}>
+                        {isScreenLocked && (
+                            <View style={styles.lockInfo}>
+                                <Text style={styles.lockText}>BLOQUEADO</Text>
+                                <Text style={styles.lockSubtext}>Tocar</Text>
+                            </View>
+                        )}
+                    </View>
+                </TouchableWithoutFeedback>
             </View>
 
             <Modal
@@ -384,8 +485,8 @@ const MonitorScreen = ({ navigation }: any) => {
             >
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Share Monitor</Text>
-                        <Text style={styles.modalSubtitle}>Enter the email of the person you want to share this camera with.</Text>
+                        <Text style={styles.modalTitle}>Compartir</Text>
+                        <Text style={styles.modalSubtitle}>Email de destino:</Text>
 
                         <TextInput
                             style={styles.input}
@@ -402,14 +503,14 @@ const MonitorScreen = ({ navigation }: any) => {
                                 style={[styles.modalButton, styles.cancelButton]}
                                 onPress={() => setShowShareModal(false)}
                             >
-                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                                <Text style={styles.cancelButtonText}>Cancelar</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.modalButton, styles.confirmButton]}
                                 onPress={handleShare}
                                 disabled={isSharing}
                             >
-                                {isSharing ? <ActivityIndicator color="#FFF" /> : <Text style={styles.confirmButtonText}>Share</Text>}
+                                {isSharing ? <ActivityIndicator color="#FFF" /> : <Text style={styles.confirmButtonText}>Enviar</Text>}
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -442,6 +543,9 @@ const styles = StyleSheet.create({
     confirmButton: { backgroundColor: '#0EA5E9' },
     cancelButtonText: { color: '#94A3B8', fontWeight: '600' },
     confirmButtonText: { color: '#FFF', fontWeight: '700' },
+    lockInfo: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    lockText: { color: '#FFF', fontSize: 32, fontWeight: '900', letterSpacing: 4 },
+    lockSubtext: { color: '#94A3B8', fontSize: 16, marginTop: 12 },
 });
 
 export default MonitorScreen;
