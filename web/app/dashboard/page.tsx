@@ -1,7 +1,7 @@
 import { auth, signOut } from "@/auth"
 import { getDevices } from "@/lib/api"
 import Link from "next/link"
-import { formatDistanceToNow } from "date-fns"
+import { format, formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 
 export default async function DashboardPage() {
@@ -99,8 +99,7 @@ export default async function DashboardPage() {
                             <div className="mt-4 pt-4 border-t border-slate-700">
                                 <p className="text-xs text-slate-400">
                                     Última actividad:{' '}
-                                    {formatDistanceToNow(new Date(device.lastSeen), {
-                                        addSuffix: true,
+                                    {format(new Date(device.lastSeen), "d 'de' MMM, HH:mm:ss", {
                                         locale: es,
                                     })}
                                 </p>

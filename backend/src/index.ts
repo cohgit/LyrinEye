@@ -380,17 +380,17 @@ app.get('/api/devices', async (req, res) => {
 
         const devices = [];
         for await (const entity of deviceEntities) {
-            // We can enrich this later with real-time status from memory sessions
+            const isTransmitting = LogcatService.isSessionActive(entity.rowKey as string);
             devices.push({
                 id: entity.rowKey,
                 name: entity.name || (entity.rowKey as string).substring(0, 8),
-                status: 'online', // Mock for now, will improve later
+                status: 'online',
                 battery: 0.8,
                 cpu: 10,
                 ram: 512,
-                lastSeen: entity.registeredAt || new Date().toISOString(),
+                lastSeen: isTransmitting ? new Date().toISOString() : (entity.registeredAt || new Date().toISOString()),
                 isCharging: false,
-                isTransmitting: LogcatService.isSessionActive(entity.rowKey as string),
+                isTransmitting: isTransmitting,
                 isRecording: false
             });
         }
