@@ -410,17 +410,11 @@ app.get('/api/devices/:id', async (req, res) => {
         // Check if device sends logs (is transmitting)
         const isTransmitting = LogcatService.isSessionActive(deviceId);
 
-        // TODO: Retrieve real battery/CPU/RAM from a dedicated table if available.
-        // For now, we return the session status and some default/mock values
-        // that the frontend might override with real telemetry if available via other means.
-
-        const isTransmitting = LogcatService.isSessionActive(deviceId);
-
         res.send({
             id: deviceId,
             name: deviceId,
             status: 'online',
-            lastSeen: isTransmitting ? new Date().toISOString() : new Date().toISOString(), // Still using now for online assumption, but could improve
+            lastSeen: isTransmitting ? new Date().toISOString() : new Date().toISOString(),
             isTransmitting: isTransmitting,
             isRecording: false,
             battery: 0.8,
