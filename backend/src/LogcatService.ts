@@ -122,7 +122,10 @@ export async function queryLogs(deviceId: string, kqlQuery?: string, timespan: s
             return result.tables[0].rows.map(row => {
                 const entry: any = {};
                 result.tables[0].columnDescriptors.forEach((col, idx) => {
-                    entry[col.name] = row[idx];
+                    const colName = col.name as string;
+                    if (colName) {
+                        entry[colName] = row[idx];
+                    }
                 });
                 return entry;
             });
