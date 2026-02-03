@@ -221,14 +221,16 @@ app.post('/recordings', async (req, res) => {
             });
 
             for await (const entity of userDevicesEntities) {
-                await userDevicesClient.upsertEntity({
-                    partitionKey: entity.partitionKey,
-                    rowKey: entity.rowKey,
-                    registeredAt: new Date().toISOString(), // This is our 'lastSeen'
-                    wifiSSID: wifiSSID || entity.wifiSSID || null,
-                    appVersion: appVersion || entity.appVersion || null,
-                    androidVersion: androidVersion || entity.androidVersion || null
-                });
+                if (entity.partitionKey && entity.rowKey) {
+                    await userDevicesClient.upsertEntity({
+                        partitionKey: entity.partitionKey as string,
+                        rowKey: entity.rowKey as string,
+                        registeredAt: new Date().toISOString(), // This is our 'lastSeen'
+                        wifiSSID: wifiSSID || entity.wifiSSID || null,
+                        appVersion: appVersion || entity.appVersion || null,
+                        androidVersion: androidVersion || entity.androidVersion || null
+                    });
+                }
             }
         }
 
