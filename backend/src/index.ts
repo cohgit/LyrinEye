@@ -27,6 +27,11 @@ const CONNECTION_STRING = process.env.STORAGE_CONNECTION_STRING || '';
 const blobServiceClient = BlobServiceClient.fromConnectionString(CONNECTION_STRING);
 const tableClient = TableClient.fromConnectionString(CONNECTION_STRING, 'camerametadata');
 const userDevicesClient = TableClient.fromConnectionString(CONNECTION_STRING, 'userdevices');
+const deviceTokensClient = TableClient.fromConnectionString(CONNECTION_STRING, 'devicetokens');
+
+// Firebase and Logcat Services
+import { initializeFirebase, sendPushNotification } from './FirebaseService';
+import { initializeLogcatTable, receiveLogcat, LogcatEntry } from './LogcatService';
 
 // Ensure resources exist
 async function initStorage() {
@@ -42,6 +47,13 @@ async function initStorage() {
         await userDevicesClient.createTable().catch((e: any) => {
             if (e.statusCode !== 409) throw e;
         });
+
+        await deviceTokensClient.createTable().catch((e: any) => {
+            if (e.statusCode !== 409) throw e;
+        });
+
+        await initializeLogcatTable();
+        initializeFirebase();
 
         console.log('Azure Storage resources ready.');
     } catch (error) {
@@ -322,6 +334,82 @@ app.get('/recordings', async (req, res) => {
 
         res.send(finalResults.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
     } catch (error: any) {
+        res.status(500).send({ error: error.message });
+    }
+});
+
+// --- Device Management Endpoints ---
+
+// Register Device FCM Token
+app.post('/api/devices/register-token', async (req, res) => {
+    try {
+        const { deviceId, fcmToken } = req.body;
+        if (!deviceId || !fcmToken) {
+            return res.status(400).send({ error: 'deviceId and fcmToken are required' });
+        }
+
+        console.log(`[FCM] Registering token for device ${deviceId}`);
+        await deviceTokensClient.upsertEntity({
+            partitionKey: deviceId,
+            rowKey: 'fcm',
+            token: fcmToken,
+            updatedAt: new Date().toISOString(),
+        });
+
+        res.send({ status: 'registered', deviceId });
+    } catch (error: any) {
+        console.error(`[FCM] Failed to register token:`, error);
+        res.status(500).send({ error: error.message });
+    }
+});
+
+// Send Remote Command to Device
+app.post('/api/devices/:id/commands', async (req, res) => {
+    try {
+        const { id: deviceId } = req.params;
+        const { command } = req.body;
+
+        if (!command) {
+            return res.status(400).send({ error: 'command is required' });
+        }
+
+        console.log(`[COMMAND] Sending '${command}' to device ${deviceId}`);
+
+        // Get device FCM token
+        const tokenEntity = await deviceTokensClient.getEntity(deviceId, 'fcm');
+        const fcmToken = tokenEntity.token as string;
+
+        if (!fcmToken) {
+            return res.status(404).send({ error: 'Device token not found' });
+        }
+
+        // Send push notification
+        const result = await sendPushNotification(fcmToken, command);
+        res.send({ status: 'sent', ...result });
+    } catch (error: any) {
+        console.error(`[COMMAND] Failed to send command:`, error);
+        if (error.message.includes('not found')) {
+            res.status(404).send({ error: 'Device not found or token not registered' });
+        } else {
+            res.status(500).send({ error: error.message });
+        }
+    }
+});
+
+// Receive Logcat from Device
+app.post('/api/devices/:id/logcat', async (req, res) => {
+    try {
+        const { id: deviceId } = req.params;
+        const { logs } = req.body;
+
+        if (!Array.isArray(logs)) {
+            return res.status(400).send({ error: 'logs must be an array' });
+        }
+
+        await receiveLogcat(deviceId, logs as LogcatEntry[]);
+        res.send({ status: 'received', count: logs.length });
+    } catch (error: any) {
+        console.error(`[LOGCAT] Failed to receive logs:`, error);
         res.status(500).send({ error: error.message });
     }
 });
