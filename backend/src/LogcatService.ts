@@ -174,42 +174,100 @@ export async function queryLogs(deviceId: string, kqlQuery?: string, timespan: s
 }
 
 
+const recordingsTableClient = TableClient.fromConnectionString(CONNECTION_STRING, 'camerametadata');
+
 export async function getLogStats(deviceId: string, start: string, end: string, granularity: '1d' | '1h' | '1m') {
     if (!WORKSPACE_ID) return [];
 
     try {
+        // 1. Get logs from Log Analytics (KQL)
+        // Fix: Case-insensitive match =~ and quotes for datetime
         const query = `logcat_CL 
-            | where DeviceName == "${deviceId}"
-            | where TimeGenerated between (datetime(${start}) .. datetime(${end}))
+            | where DeviceName =~ "${deviceId}"
+            | where TimeGenerated between (datetime("${start}") .. datetime("${end}"))
             | summarize Count=count() by Timestamp=bin(TimeGenerated, ${granularity})
             | order by Timestamp asc`;
 
         // Calculate duration to ensure query covers the range
-        // Azure Monitor requires an ISO 8601 duration string or specific format
         // P365D covers a year, which is safe for our use case
         const duration = 'P365D';
 
-        const result = await logsQueryClient.queryWorkspace(
+        const logPromise = logsQueryClient.queryWorkspace(
             WORKSPACE_ID,
             query,
             { duration: duration as any }
         );
 
-        if (result.status === 'Success') {
-            return result.tables[0].rows.map(row => {
-                const entry: any = {};
-                result.tables[0].columnDescriptors.forEach((col, idx) => {
-                    const colName = col.name as string;
-                    if (colName) {
-                        entry[colName] = row[idx];
+        // 2. Get recordings from Table Storage (camerametadata)
+        // Note: PartitionKey is usually the deviceId (roomId)
+        const recordingPromise = (async () => {
+            try {
+                const results = [];
+                // Filter by PartitionKey and timestamp range (using lowercase 'timestamp' field)
+                const entities = recordingsTableClient.listEntities({
+                    queryOptions: {
+                        filter: `PartitionKey eq '${deviceId}' and timestamp ge datetime'${start}' and timestamp le datetime'${end}'`
                     }
                 });
-                return entry;
+                for await (const entity of entities) {
+                    results.push(entity);
+                }
+                return results;
+            } catch (e) {
+                console.error('[LOGCAT] Error fetching recordings for stats:', e);
+                return [];
+            }
+        })();
+
+        const [logResult, recordings] = await Promise.all([logPromise, recordingPromise]);
+
+        const mergedStats = new Map<string, { Timestamp: string, Count: number }>();
+
+        // Process Logs from Log Analytics
+        if (logResult.status === 'Success') {
+            const table = logResult.tables[0];
+            table.rows.forEach(row => {
+                const entry: any = {};
+                table.columnDescriptors.forEach((col, idx) => {
+                    const colName = col.name as string;
+                    if (colName) entry[colName] = row[idx];
+                });
+                if (entry.Timestamp) {
+                    const ts = new Date(entry.Timestamp).toISOString();
+                    mergedStats.set(ts, { Timestamp: ts, Count: entry.Count });
+                }
             });
         }
-        return [];
+
+        // Process Recordings from Table Storage
+        recordings.forEach((rec: any) => {
+            if (!rec.timestamp) return;
+            const ts = new Date(rec.timestamp);
+            let binDate;
+
+            if (granularity === '1d') {
+                binDate = new Date(ts.getFullYear(), ts.getMonth(), ts.getDate());
+            } else if (granularity === '1h') {
+                binDate = new Date(ts.getFullYear(), ts.getMonth(), ts.getDate(), ts.getHours());
+            } else {
+                binDate = new Date(ts.getFullYear(), ts.getMonth(), ts.getDate(), ts.getHours(), ts.getMinutes());
+            }
+
+            const binStr = binDate.toISOString();
+            const existing = mergedStats.get(binStr);
+            if (existing) {
+                existing.Count += 1; // Sum activity
+            } else {
+                mergedStats.set(binStr, { Timestamp: binStr, Count: 1 });
+            }
+        });
+
+        // Convert Map to sorted array
+        return Array.from(mergedStats.values())
+            .sort((a, b) => new Date(a.Timestamp).getTime() - new Date(b.Timestamp).getTime());
+
     } catch (error: any) {
-        console.error('[LOGCAT] Error getting log stats:', error.message);
+        console.error('[LOGCAT] Error getting combined log stats:', error.message);
         return [];
     }
 }
