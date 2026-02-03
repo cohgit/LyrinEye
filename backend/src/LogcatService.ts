@@ -14,6 +14,42 @@ const SHARED_KEY = process.env.LOG_ANALYTICS_SHARED_KEY || '';
 // Monitor Query Client for reading logs
 const logsQueryClient = new LogsQueryClient(new DefaultAzureCredential());
 
+// Session Management
+const activeSessions = new Map<string, number>(); // deviceId -> expiryTimestamp
+const CONCURRENCY_LIMIT = parseInt(process.env.LOGCAT_CONCURRENCY_LIMIT || '1');
+
+export function canStartSession(deviceId: string): boolean {
+    const now = Date.now();
+    // Cleanup expired sessions
+    for (const [id, expiry] of activeSessions.entries()) {
+        if (expiry < now) activeSessions.delete(id);
+    }
+
+    if (activeSessions.has(deviceId)) return true;
+    return activeSessions.size < CONCURRENCY_LIMIT;
+}
+
+export function startSession(deviceId: string, durationMinutes: number) {
+    const expiry = Date.now() + durationMinutes * 60 * 1000;
+    activeSessions.set(deviceId, expiry);
+    console.log(`[LOGCAT] Session started for ${deviceId} until ${new Date(expiry).toISOString()}`);
+}
+
+export function isSessionActive(deviceId: string): boolean {
+    const expiry = activeSessions.get(deviceId);
+    return expiry ? expiry > Date.now() : false;
+}
+
+export function getActiveSessionInfo(deviceId: string) {
+    const expiry = activeSessions.get(deviceId);
+    if (!expiry || expiry < Date.now()) return null;
+    return {
+        deviceId,
+        expiresAt: new Date(expiry).toISOString(),
+        remainingMinutes: Math.ceil((expiry - Date.now()) / 60000)
+    };
+}
+
 export async function initializeLogcatTable() {
     try {
         await logcatTableClient.createTable().catch((e: any) => {

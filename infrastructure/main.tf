@@ -108,6 +108,11 @@ resource "azurerm_container_app" "backend" {
         name  = "LOG_ANALYTICS_SHARED_KEY"
         value = azurerm_log_analytics_workspace.main.primary_shared_key
       }
+
+      env {
+        name  = "LOGCAT_CONCURRENCY_LIMIT"
+        value = "1"
+      }
     }
 
     min_replicas = 0

@@ -388,6 +388,17 @@ app.post('/api/devices/:id/commands', async (req, res) => {
             return res.status(400).send({ error: 'command is required' });
         }
 
+        if (command === 'request_logcat') {
+            const { durationMinutes = 15 } = req.body;
+            if (!LogcatService.canStartSession(deviceId)) {
+                return res.status(429).send({
+                    error: 'Limite de concurrencia alcanzado',
+                    message: 'Solo un dispositivo puede tener una sesión de logcat activa a la vez.'
+                });
+            }
+            LogcatService.startSession(deviceId, durationMinutes);
+        }
+
         console.log(`[COMMAND] Sending '${command}' to device ${deviceId}`);
 
         // Get device FCM token
@@ -409,6 +420,13 @@ app.post('/api/devices/:id/commands', async (req, res) => {
             res.status(500).send({ error: error.message });
         }
     }
+});
+
+// Check Logcat Session Status
+app.get('/api/devices/:id/session', (req, res) => {
+    const { id: deviceId } = req.params;
+    const session = LogcatService.getActiveSessionInfo(deviceId);
+    res.send(session || { active: false });
 });
 
 // Receive Logcat from Device

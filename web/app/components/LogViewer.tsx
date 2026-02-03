@@ -20,7 +20,21 @@ export default function LogViewer({ deviceId }: LogViewerProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [query, setQuery] = useState('');
     const [autoRefresh, setAutoRefresh] = useState(false);
+    const [duration, setDuration] = useState(15);
+    const [sessionInfo, setSessionInfo] = useState<{ expiresAt: string; remainingMinutes: number } | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+
+    const checkSession = async () => {
+        try {
+            const response = await fetch(`/api/proxy/devices/${deviceId}/session`);
+            if (response.ok) {
+                const data = await response.json();
+                setSessionInfo(data.expiresAt ? data : null);
+            }
+        } catch (error) {
+            console.error('Failed to check session:', error);
+        }
+    };
 
     const fetchLogs = async (isManual = false) => {
         if (isLoading && !isManual) return;
@@ -45,25 +59,35 @@ export default function LogViewer({ deviceId }: LogViewerProps) {
             const response = await fetch(`/api/proxy/devices/${deviceId}/commands`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ command: 'request_logcat' }),
+                body: JSON.stringify({ command: 'request_logcat', durationMinutes: duration }),
             });
             if (response.ok) {
+                checkSession();
                 // Wait a bit for the device to send logs and for Azure to ingest them
                 setTimeout(() => fetchLogs(true), 5000);
+            } else {
+                const err = await response.json();
+                alert(err.message || err.error || 'Error al iniciar sesión de logcat');
             }
         } catch (error) {
             console.error('Failed to request logs:', error);
+        } finally {
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
         fetchLogs();
-        let interval: any;
+        checkSession();
+        let logInterval: any;
         if (autoRefresh) {
-            interval = setInterval(fetchLogs, 10000);
+            logInterval = setInterval(fetchLogs, 10000);
         }
-        return () => clearInterval(interval);
+        const sessionInterval = setInterval(checkSession, 30000);
+        return () => {
+            clearInterval(logInterval);
+            clearInterval(sessionInterval);
+        };
     }, [deviceId, autoRefresh]);
 
     useEffect(() => {
@@ -114,6 +138,18 @@ export default function LogViewer({ deviceId }: LogViewerProps) {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <select
+                        value={duration}
+                        onChange={(e) => setDuration(parseInt(e.target.value))}
+                        className="bg-slate-700 border border-slate-600 rounded-lg py-1 px-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                        title="Duración de la sesión"
+                    >
+                        <option value={15}>15 min</option>
+                        <option value={30}>30 min</option>
+                        <option value={60}>1 hora</option>
+                        <option value={1440}>1 día</option>
+                    </select>
+
                     <button
                         onClick={requestFreshLogs}
                         disabled={isLoading}
@@ -186,9 +222,10 @@ export default function LogViewer({ deviceId }: LogViewerProps) {
             <div className="bg-slate-800 px-4 py-1.5 border-t border-slate-700 flex items-center justify-between text-[10px] text-slate-500">
                 <div className="flex items-center gap-4">
                     <span className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>
-                        Conectado
+                        <span className={`w-1.5 h-1.5 rounded-full ${sessionInfo ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'bg-slate-500'}`}></span>
+                        {sessionInfo ? `Activo (${sessionInfo.remainingMinutes}m rest)` : 'Inactivo'}
                     </span>
+                    <span className="h-3 w-[1px] bg-slate-700"></span>
                     <span>{logs.length} entradas cargadas</span>
                 </div>
                 <div>
