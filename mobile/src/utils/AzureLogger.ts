@@ -56,6 +56,7 @@ class AzureLoggerService {
             const netState = await NetInfo.fetch();
 
             const logEntry = {
+                DeviceId: await DeviceInfo.getUniqueId(),
                 AppVersion: this.appVersion,
                 LogText: message,
                 Timestamp: new Date().toISOString(),

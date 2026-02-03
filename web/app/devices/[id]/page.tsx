@@ -62,7 +62,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                         <div>
                             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                                 {device.name}
-                                {device.isTransmitting && (
+                                {(device.isTransmitting || device.streaming) && (
                                     <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-400 text-xs border border-indigo-500/30 animate-pulse">
                                         <Radio className="w-3 h-3" />
                                         Transmitiendo
@@ -141,6 +141,23 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                                         <Wifi className="w-4 h-4" /> WiFi
                                     </dt>
                                     <dd className="text-sm text-white mt-1">{device.wifiSSID || 'No disponible'}</dd>
+                                </div>
+                                {device.ipAddress && (
+                                    <div>
+                                        <dt className="text-sm text-slate-400">IP del Cliente</dt>
+                                        <dd className="text-sm text-white mt-1">{device.ipAddress}</dd>
+                                    </div>
+                                )}
+                                <div>
+                                    <dt className="text-sm text-slate-400">Estado de Red</dt>
+                                    <dd className="text-sm text-white mt-1">
+                                        {device.telemetry?.ConnectionStart ? (
+                                            <span className="text-green-400 flex items-center gap-1">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
+                                                Conectado
+                                            </span>
+                                        ) : 'Desconectado'}
+                                    </dd>
                                 </div>
                                 {device.location && (
                                     <div>

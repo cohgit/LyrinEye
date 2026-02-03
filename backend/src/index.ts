@@ -460,41 +460,53 @@ app.get('/api/devices/:id', async (req, res) => {
         }
 
         const isTransmitting = LogcatService.isSessionActive(deviceId);
+        const telemetry = await LogcatService.getLatestTelemetry(deviceId);
 
-        if (!deviceEntity) {
-            // Fallback for demo/missing devices
-            return res.send({
-                id: deviceId,
-                name: deviceId,
-                status: 'online',
-                lastSeen: isTransmitting ? new Date().toISOString() : new Date().toISOString(),
-                isTransmitting: isTransmitting,
-                isRecording: false,
-                battery: 0.8,
-                isCharging: true,
-                cpu: 15,
-                ram: 512,
-                androidVersion: '?',
-                appVersion: '?',
-                wifiSSID: null
-            });
+        // Helper to get value regardless of Azure suffix (_s, _d, _b)
+        const getVal = (obj: any, baseKey: string) => {
+            if (!obj) return null;
+            return obj[baseKey] ?? obj[`${baseKey}_s`] ?? obj[`${baseKey}_d`] ?? obj[`${baseKey}_b`] ?? obj[`${baseKey}_g`];
+        };
+
+        const cpu = getVal(telemetry, 'CPUUsage');
+        const ram = getVal(telemetry, 'RamTotalMB');
+        const appVer = getVal(telemetry, 'AppVersion');
+        const androidVer = getVal(telemetry, 'AndroidVersion');
+        const wifi = getVal(telemetry, 'WifiSSID');
+        const ip = getVal(telemetry, 'ClientIP');
+        const streaming = getVal(telemetry, 'Streaming');
+        const battery = getVal(telemetry, 'BatteryLevel');
+        const isConn = getVal(telemetry, 'ConnectionStart');
+        const isCharging = getVal(telemetry, 'IsCharging');
+
+        const deviceData = {
+            id: deviceId,
+            name: (deviceEntity as any)?.name || deviceId.substring(0, 8),
+            status: 'online',
+            lastSeen: isTransmitting || streaming ? new Date().toISOString() : ((deviceEntity as any)?.registeredAt || new Date().toISOString()),
+            isTransmitting: isTransmitting || streaming === true || streaming === "true",
+            isRecording: false, // Will be calculated below
+            battery: battery ? parseFloat(battery) : 0.8,
+            isCharging: isCharging === true || isCharging === "true",
+            cpu: cpu ? parseFloat(cpu) : 15,
+            ram: ram ? parseFloat(ram) : 512,
+            androidVersion: androidVer || (deviceEntity as any)?.androidVersion || '?',
+            appVersion: appVer || (deviceEntity as any)?.appVersion || '?',
+            wifiSSID: wifi || (deviceEntity as any)?.wifiSSID || null,
+            ipAddress: ip || null,
+            streaming: streaming === true || streaming === "true",
+            connectionStart: isConn === true || isConn === "true",
+            telemetry: telemetry || {}
+        };
+
+        // Recalculate isRecording based on lastRecordingAt (from recordings table)
+        if ((deviceEntity as any)?.lastRecordingAt) {
+            const lastRec = new Date((deviceEntity as any).lastRecordingAt as string).getTime();
+            deviceData.isRecording = (Date.now() - lastRec) < 120000;
+            if (deviceData.isRecording) deviceData.lastSeen = new Date().toISOString();
         }
 
-        res.send({
-            id: deviceId,
-            name: deviceEntity.name || deviceId.substring(0, 8),
-            status: 'online',
-            lastSeen: isTransmitting ? new Date().toISOString() : (deviceEntity.registeredAt || new Date().toISOString()),
-            isTransmitting: isTransmitting,
-            isRecording: false,
-            battery: 0.8,
-            isCharging: true,
-            cpu: 15,
-            ram: 512,
-            androidVersion: deviceEntity.androidVersion || '?',
-            appVersion: deviceEntity.appVersion || '?',
-            wifiSSID: deviceEntity.wifiSSID || null
-        });
+        res.send(deviceData);
     } catch (error: any) {
         console.error(`[DEVICES] Failed to get device details:`, error);
         res.status(500).send({ error: error.message });

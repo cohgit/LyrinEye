@@ -20,7 +20,7 @@ export interface TelemetryData {
 }
 
 export interface DeviceDetail extends Device {
-    telemetry: TelemetryData[]
+    telemetry: any
     location?: {
         latitude: number
         longitude: number
@@ -28,4 +28,6 @@ export interface DeviceDetail extends Device {
     androidVersion: string
     appVersion: string
     wifiSSID: string
+    ipAddress?: string
+    streaming?: boolean
 }

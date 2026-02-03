@@ -173,6 +173,34 @@ export async function queryLogs(deviceId: string, kqlQuery?: string, timespan: s
     }
 }
 
+export async function getLatestTelemetry(deviceId: string) {
+    if (!WORKSPACE_ID) return null;
+
+    try {
+        const query = `LyrinEyeTelemetria_CL | where DeviceName =~ "${deviceId}" or DeviceId_s == "${deviceId}" or DeviceId == "${deviceId}" | order by TimeGenerated desc | take 1`;
+        const result = await logsQueryClient.queryWorkspace(
+            WORKSPACE_ID,
+            query,
+            { duration: 'P30D' as any }
+        );
+
+        if (result.status === 'Success' && result.tables[0].rows.length > 0) {
+            const table = result.tables[0];
+            const row = table.rows[0];
+            const entry: any = {};
+            table.columnDescriptors.forEach((col, idx) => {
+                const colName = col.name as string;
+                if (colName) entry[colName] = row[idx];
+            });
+            return entry;
+        }
+        return null;
+    } catch (error: any) {
+        console.error('[TELEMETRY] Error querying telemetry:', error.message);
+        return null;
+    }
+}
+
 
 const recordingsTableClient = TableClient.fromConnectionString(CONNECTION_STRING, 'camerametadata');
 
