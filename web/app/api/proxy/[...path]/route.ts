@@ -21,8 +21,17 @@ export async function GET(
             },
         });
 
-        const data = await response.json();
-        return NextResponse.json(data, { status: response.status });
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            return NextResponse.json(data, { status: response.status });
+        } else {
+            const text = await response.text();
+            return new NextResponse(text, {
+                status: response.status,
+                headers: { 'Content-Type': contentType || 'text/plain' }
+            });
+        }
     } catch (error: any) {
         console.error(`[PROXY ERROR] GET ${url}:`, error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -49,8 +58,17 @@ export async function POST(
             body: JSON.stringify(body),
         });
 
-        const data = await response.json();
-        return NextResponse.json(data, { status: response.status });
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            return NextResponse.json(data, { status: response.status });
+        } else {
+            const text = await response.text();
+            return new NextResponse(text, {
+                status: response.status,
+                headers: { 'Content-Type': contentType || 'text/plain' }
+            });
+        }
     } catch (error: any) {
         console.error(`[PROXY ERROR] POST ${url}:`, error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
