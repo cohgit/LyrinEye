@@ -407,25 +407,56 @@ app.get('/api/devices/:id', async (req, res) => {
     try {
         const { id: deviceId } = req.params;
 
-        // Check if device sends logs (is transmitting)
+        // Find device in userdevices table
+        // Since PartitionKey is the email and we don't have it, we search by RowKey
+        const entities = userDevicesClient.listEntities({
+            queryOptions: { filter: `RowKey eq '${deviceId}'` }
+        });
+
+        let deviceEntity = null;
+        for await (const entity of entities) {
+            deviceEntity = entity;
+            break;
+        }
+
         const isTransmitting = LogcatService.isSessionActive(deviceId);
+
+        if (!deviceEntity) {
+            // Fallback for demo/missing devices
+            return res.send({
+                id: deviceId,
+                name: deviceId,
+                status: 'online',
+                lastSeen: isTransmitting ? new Date().toISOString() : new Date().toISOString(),
+                isTransmitting: isTransmitting,
+                isRecording: false,
+                battery: 0.8,
+                isCharging: true,
+                cpu: 15,
+                ram: 512,
+                androidVersion: '13',
+                appVersion: '1.0.0',
+                wifiSSID: 'LyrinEye_WiFi'
+            });
+        }
 
         res.send({
             id: deviceId,
-            name: deviceId,
+            name: deviceEntity.name || deviceId.substring(0, 8),
             status: 'online',
-            lastSeen: isTransmitting ? new Date().toISOString() : new Date().toISOString(),
+            lastSeen: isTransmitting ? new Date().toISOString() : (deviceEntity.registeredAt || new Date().toISOString()),
             isTransmitting: isTransmitting,
             isRecording: false,
             battery: 0.8,
             isCharging: true,
             cpu: 15,
             ram: 512,
-            androidVersion: '13',
-            appVersion: '1.0.0',
-            wifiSSID: 'LyrinEye_WiFi'
+            androidVersion: deviceEntity.androidVersion || '13',
+            appVersion: deviceEntity.appVersion || '1.0.0',
+            wifiSSID: deviceEntity.wifiSSID || 'LyrinEye_WiFi'
         });
     } catch (error: any) {
+        console.error(`[DEVICES] Failed to get device details:`, error);
         res.status(500).send({ error: error.message });
     }
 });
