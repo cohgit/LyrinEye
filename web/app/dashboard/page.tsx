@@ -43,69 +43,93 @@ export default async function DashboardPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {devices.map((device) => (
-                        <Link
-                            key={device.id}
-                            href={`/devices/${device.id}`}
-                            className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-slate-600 transition-all duration-200 hover:scale-[1.02]"
-                        >
-                            {/* Status Badge */}
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-semibold text-white">{device.name}</h3>
-                                <span
-                                    className={`px-3 py-1 rounded-full text-xs font-medium ${device.status === 'online'
-                                        ? 'bg-green-500/20 text-green-400'
-                                        : 'bg-red-500/20 text-red-400'
-                                        }`}
-                                >
-                                    {device.status === 'online' ? 'En línea' : 'Desconectado'}
-                                </span>
-                            </div>
+                    {devices.map((device) => {
+                        const lastSeenDate = new Date(device.lastSeen);
+                        const diffMs = Date.now() - lastSeenDate.getTime();
+                        const diffMin = diffMs / (1000 * 60);
+                        const diffDay = diffMs / (1000 * 60 * 60 * 24);
 
-                            {/* Metrics */}
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-slate-400">Batería</span>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full ${device.battery > 0.5
-                                                    ? 'bg-green-500'
-                                                    : device.battery > 0.2
-                                                        ? 'bg-yellow-500'
-                                                        : 'bg-red-500'
-                                                    }`}
-                                                style={{ width: `${device.battery * 100}%` }}
-                                            />
+                        let statusLabel = 'Offline';
+                        let statusColor = 'bg-red-500/20 text-red-400';
+                        let showMetrics = true;
+
+                        if (diffMin < 1) {
+                            statusLabel = 'En línea';
+                            statusColor = 'bg-green-500/20 text-green-400';
+                        } else if (diffDay < 1) {
+                            statusLabel = 'Inactivo';
+                            statusColor = 'bg-yellow-500/20 text-yellow-400';
+                        } else {
+                            statusLabel = 'Desconectado';
+                            statusColor = 'bg-red-500/20 text-red-400';
+                            showMetrics = false;
+                        }
+
+                        return (
+                            <Link
+                                key={device.id}
+                                href={`/devices/${device.id}`}
+                                className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-slate-600 transition-all duration-200 hover:scale-[1.02]"
+                            >
+                                {/* Status Badge */}
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-semibold text-white">{device.name}</h3>
+                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColor}`}>
+                                        {statusLabel}
+                                    </span>
+                                </div>
+
+                                {/* Metrics */}
+                                {showMetrics ? (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-slate-400">Batería</span>
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full ${device.battery > 0.5
+                                                            ? 'bg-green-500'
+                                                            : device.battery > 0.2
+                                                                ? 'bg-yellow-500'
+                                                                : 'bg-red-500'
+                                                            }`}
+                                                        style={{ width: `${device.battery * 100}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-sm text-white w-12 text-right">
+                                                    {Math.round(device.battery * 100)}%
+                                                </span>
+                                            </div>
                                         </div>
-                                        <span className="text-sm text-white w-12 text-right">
-                                            {Math.round(device.battery * 100)}%
-                                        </span>
+
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-slate-400">CPU</span>
+                                            <span className="text-sm text-white">{device.cpu?.toFixed(1)}%</span>
+                                        </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-slate-400">RAM</span>
+                                            <span className="text-sm text-white">{device.ram?.toFixed(0)} MB</span>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-6 text-slate-500 italic text-xs">
+                                        <p>Sin datos recientes</p>
+                                    </div>
+                                )}
 
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-slate-400">CPU</span>
-                                    <span className="text-sm text-white">{device.cpu?.toFixed(1)}%</span>
+                                {/* Last Seen */}
+                                <div className="mt-4 pt-4 border-t border-slate-700">
+                                    <p className="text-xs text-slate-400">
+                                        Última actividad:{' '}
+                                        {format(lastSeenDate, "d 'de' MMM, HH:mm:ss", {
+                                            locale: es,
+                                        })}
+                                    </p>
                                 </div>
-
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-slate-400">RAM</span>
-                                    <span className="text-sm text-white">{device.ram?.toFixed(0)} MB</span>
-                                </div>
-                            </div>
-
-                            {/* Last Seen */}
-                            <div className="mt-4 pt-4 border-t border-slate-700">
-                                <p className="text-xs text-slate-400">
-                                    Última actividad:{' '}
-                                    {format(new Date(device.lastSeen), "d 'de' MMM, HH:mm:ss", {
-                                        locale: es,
-                                    })}
-                                </p>
-                            </div>
-                        </Link>
-                    ))}
+                            </Link>
+                        );
+                    })}
                 </div>
 
                 {devices.length === 0 && (
