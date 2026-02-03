@@ -210,8 +210,31 @@ app.post('/recordings', async (req, res) => {
             url: blobServiceClient.getContainerClient('recordings').getBlobClient(blobName).url
         });
 
+        // Update last activity for this device in userDevices table
+        if (deviceId && deviceId !== 'unknown') {
+            const wifiSSID = req.body.wifiSSID;
+            const appVersion = req.body.appVersion;
+            const androidVersion = req.body.androidVersion;
+
+            const userDevicesEntities = userDevicesClient.listEntities({
+                queryOptions: { filter: `RowKey eq '${deviceId}'` }
+            });
+
+            for await (const entity of userDevicesEntities) {
+                await userDevicesClient.upsertEntity({
+                    partitionKey: entity.partitionKey,
+                    rowKey: entity.rowKey,
+                    registeredAt: new Date().toISOString(), // This is our 'lastSeen'
+                    wifiSSID: wifiSSID || entity.wifiSSID || null,
+                    appVersion: appVersion || entity.appVersion || null,
+                    androidVersion: androidVersion || entity.androidVersion || null
+                });
+            }
+        }
+
         res.status(201).send({ status: 'saved' });
     } catch (error: any) {
+        console.error(`[RECORDINGS] Failed to save/update:`, error);
         res.status(500).send({ error: error.message });
     }
 });
@@ -219,7 +242,7 @@ app.post('/recordings', async (req, res) => {
 // Register Device to User
 app.post('/register-device', async (req, res) => {
     try {
-        const { deviceId, email } = req.body;
+        const { deviceId, email, wifiSSID, appVersion, androidVersion } = req.body;
         if (!deviceId || !email) return res.status(400).send({ error: 'deviceId and email are required' });
 
         const normalizedEmail = email.toLowerCase();
@@ -227,7 +250,10 @@ app.post('/register-device', async (req, res) => {
         await userDevicesClient.upsertEntity({
             partitionKey: normalizedEmail,
             rowKey: deviceId,
-            registeredAt: new Date().toISOString()
+            registeredAt: new Date().toISOString(),
+            wifiSSID: wifiSSID || null,
+            appVersion: appVersion || null,
+            androidVersion: androidVersion || null
         });
 
         res.send({ status: 'registered', deviceId, email: normalizedEmail });

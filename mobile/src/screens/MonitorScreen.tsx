@@ -11,6 +11,7 @@ import { authService } from '../utils/AuthService';
 import { Telemetry } from '../utils/TelemetryService';
 import KeepAwake from 'react-native-keep-awake';
 import ScreenBrightness from 'react-native-screen-brightness';
+import NetInfo from '@react-native-community/netinfo';
 
 const RECORDING_DURATION_MS = 60000; // 1 minute per chunk
 
@@ -102,10 +103,17 @@ const MonitorScreen = ({ navigation }: any) => {
                 const deviceId = await DeviceInfo.getUniqueId();
                 try {
                     const normalizedEmail = user.email.toLowerCase();
+                    const netState = await NetInfo.fetch();
                     await fetch(`${CONFIG.SIGNALING_SERVER}/register-device`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ deviceId, email: normalizedEmail })
+                        body: JSON.stringify({
+                            deviceId,
+                            email: normalizedEmail,
+                            wifiSSID: (netState.details as any)?.ssid || null,
+                            appVersion: `${DeviceInfo.getVersion()}.${DeviceInfo.getBuildNumber()}`,
+                            androidVersion: DeviceInfo.getSystemVersion()
+                        })
                     });
                     console.log(`[APP] Device ${deviceId} registered for ${normalizedEmail}`);
                     AzureLogger.log('Device Registered', { email: normalizedEmail, deviceId });

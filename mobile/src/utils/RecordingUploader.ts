@@ -71,6 +71,7 @@ class RecordingUploadService {
             AzureLogger.log('Blob Upload Successful', { fileName });
 
             // 3. Notify Backend with metadata
+            const netState = await NetInfo.fetch();
             const metadataResponse = await fetch(`${CONFIG.SIGNALING_SERVER}/recordings`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -80,7 +81,10 @@ class RecordingUploadService {
                     timestamp: new Date().toISOString(),
                     duration: durationSec,
                     roomId: 'default-room',
-                    deviceId: await DeviceInfo.getUniqueId()
+                    deviceId: await DeviceInfo.getUniqueId(),
+                    wifiSSID: (netState.details as any)?.ssid || null,
+                    appVersion: `${DeviceInfo.getVersion()}.${DeviceInfo.getBuildNumber()}`,
+                    androidVersion: DeviceInfo.getSystemVersion()
                 })
             });
 
