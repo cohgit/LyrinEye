@@ -363,6 +363,38 @@ app.post('/api/devices/register-token', async (req, res) => {
     }
 });
 
+// Get Device Details
+app.get('/api/devices/:id', async (req, res) => {
+    try {
+        const { id: deviceId } = req.params;
+
+        // Check if device sends logs (is transmitting)
+        const isTransmitting = LogcatService.isSessionActive(deviceId);
+
+        // TODO: Retrieve real battery/CPU/RAM from a dedicated table if available.
+        // For now, we return the session status and some default/mock values
+        // that the frontend might override with real telemetry if available via other means.
+
+        res.send({
+            id: deviceId,
+            name: deviceId, // Default name
+            status: 'online', // We assume online if we can query it, or improve logic later
+            lastSeen: new Date().toISOString(),
+            isTransmitting: isTransmitting,
+            isRecording: false, // Default false until we track recording state similarly
+            battery: 0.8, // Mock
+            isCharging: true, // Mock
+            cpu: 15,
+            ram: 512,
+            androidVersion: '13',
+            appVersion: '1.0.0',
+            wifiSSID: 'LyrinEye_WiFi'
+        });
+    } catch (error: any) {
+        res.status(500).send({ error: error.message });
+    }
+});
+
 // Send Remote Command to Device
 app.get('/api/devices/:id/logs', async (req, res) => {
     try {
@@ -397,6 +429,9 @@ app.post('/api/devices/:id/commands', async (req, res) => {
                 });
             }
             LogcatService.startSession(deviceId, durationMinutes);
+        } else if (command === 'start_recording') {
+            console.log(`[COMMAND] Starting remote recording for ${deviceId}`);
+            // Logic to track recording state could go here
         }
 
         console.log(`[COMMAND] Sending '${command}' to device ${deviceId}`);
@@ -427,6 +462,28 @@ app.get('/api/devices/:id/session', (req, res) => {
     const { id: deviceId } = req.params;
     const session = LogcatService.getActiveSessionInfo(deviceId);
     res.send(session || { active: false });
+});
+
+app.get('/api/devices/:id/stats/logs', async (req, res) => {
+    try {
+        const { id: deviceId } = req.params;
+        const { start, end, granularity } = req.query;
+
+        if (!start || !end || !granularity) {
+            return res.status(400).send({ error: 'Missing required parameters: start, end, granularity' });
+        }
+
+        const stats = await LogcatService.getLogStats(
+            deviceId,
+            start as string,
+            end as string,
+            granularity as '1d' | '1h' | '1m'
+        );
+        res.send(stats);
+    } catch (error: any) {
+        console.error(`[STATS] Failed to get log stats:`, error);
+        res.status(500).send({ error: error.message });
+    }
 });
 
 // Receive Logcat from Device

@@ -4,7 +4,9 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import LogViewer from "@/app/components/LogViewer"
+import DeviceViews from "@/app/components/DeviceViews"
+import DeviceActions from "@/app/components/DeviceActions"
+import { Wifi, Radio, BatteryCharging } from "lucide-react"
 
 export default async function DevicePage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
@@ -30,19 +32,31 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                         </svg>
                         Volver al Dashboard
                     </Link>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                            <h1 className="text-2xl font-bold text-white">{device.name}</h1>
+                            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                                {device.name}
+                                {device.isTransmitting && (
+                                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-400 text-xs border border-indigo-500/30 animate-pulse">
+                                        <Radio className="w-3 h-3" />
+                                        Transmitiendo
+                                    </span>
+                                )}
+                            </h1>
                             <p className="text-sm text-slate-400">{device.appVersion}</p>
                         </div>
-                        <span
-                            className={`px-4 py-2 rounded-full text-sm font-medium ${device.status === 'online'
-                                ? 'bg-green-500/20 text-green-400'
-                                : 'bg-red-500/20 text-red-400'
-                                }`}
-                        >
-                            {device.status === 'online' ? 'En línea' : 'Desconectado'}
-                        </span>
+                        <div className="flex items-center gap-4">
+                            <DeviceActions deviceId={id} />
+                            <span
+                                className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${device.status === 'online'
+                                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                    }`}
+                            >
+                                <div className={`w-2 h-2 rounded-full ${device.status === 'online' ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                                {device.status === 'online' ? 'En línea' : 'Desconectado'}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -58,9 +72,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                                 <div className="flex items-center justify-between mb-2">
                                     <h3 className="text-xs text-slate-400">Batería</h3>
                                     {device.isCharging && (
-                                        <svg className="w-4 h-4 text-yellow-500 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
-                                        </svg>
+                                        <BatteryCharging className="w-4 h-4 text-yellow-500 animate-pulse" />
                                     )}
                                 </div>
                                 <div className="text-2xl font-bold text-white">{Math.round(device.battery * 100)}%</div>
@@ -82,17 +94,19 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                             </div>
                         </div>
 
-                        {/* Logcat Viewer */}
-                        <LogViewer deviceId={id} />
+                        {/* Views (Live / History) */}
+                        <DeviceViews deviceId={id} />
                     </div>
 
                     {/* Sidebar */}
                     <div className="space-y-6">
                         <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6">
                             <h3 className="text-lg font-semibold text-white mb-4">Información</h3>
-                            <dl className="space-y-3">
+                            <dl className="space-y-4">
                                 <div>
-                                    <dt className="text-sm text-slate-400">WiFi</dt>
+                                    <dt className="text-sm text-slate-400 flex items-center gap-2">
+                                        <Wifi className="w-4 h-4" /> WiFi
+                                    </dt>
                                     <dd className="text-sm text-white mt-1">{device.wifiSSID}</dd>
                                 </div>
                                 {device.location && (

@@ -7,6 +7,8 @@ export interface Device {
     cpu: number
     ram: number
     isCharging: boolean
+    isTransmitting: boolean
+    isRecording: boolean
 }
 
 export interface TelemetryData {

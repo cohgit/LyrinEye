@@ -172,3 +172,44 @@ export async function queryLogs(deviceId: string, kqlQuery?: string, timespan: s
         return [];
     }
 }
+}
+
+export async function getLogStats(deviceId: string, start: string, end: string, granularity: '1d' | '1h' | '1m') {
+    if (!WORKSPACE_ID) return [];
+
+    try {
+        const query = `logcat_CL 
+            | where DeviceName == "${deviceId}"
+            | where TimeGenerated between (datetime(${start}) .. datetime(${end}))
+            | summarize Count=count() by Timestamp=bin(TimeGenerated, ${granularity})
+            | order by Timestamp asc`;
+
+        // Calculate duration to ensure query covers the range
+        // Azure Monitor requires an ISO 8601 duration string or specific format
+        // P365D covers a year, which is safe for our use case
+        const duration = 'P365D';
+
+        const result = await logsQueryClient.queryWorkspace(
+            WORKSPACE_ID,
+            query,
+            { duration: duration as any }
+        );
+
+        if (result.status === 'Success') {
+            return result.tables[0].rows.map(row => {
+                const entry: any = {};
+                result.tables[0].columnDescriptors.forEach((col, idx) => {
+                    const colName = col.name as string;
+                    if (colName) {
+                        entry[colName] = row[idx];
+                    }
+                });
+                return entry;
+            });
+        }
+        return [];
+    } catch (error: any) {
+        console.error('[LOGCAT] Error getting log stats:', error.message);
+        return [];
+    }
+}

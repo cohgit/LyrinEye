@@ -64,3 +64,20 @@ export async function sendPushCommand(deviceId: string, command: string) {
     )
     return response.data
 }
+
+export async function getLogStats(
+    deviceId: string,
+    start: string,
+    end: string,
+    granularity: '1d' | '1h' | '1m'
+) {
+    try {
+        const response = await axios.get(`${BACKEND_API_URL}/api/devices/${deviceId}/stats/logs`, {
+            params: { start, end, granularity }
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`Failed to fetch log stats for ${deviceId}:`, error);
+        return [];
+    }
+}

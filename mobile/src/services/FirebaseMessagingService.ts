@@ -82,6 +82,9 @@ class FCMService {
             case 'request_logcat':
                 await this.handleLogcatRequest();
                 break;
+            case 'start_recording':
+                await this.handleRecordingRequest();
+                break;
             default:
                 console.warn(`[FCM] Unknown command: ${data.command}`);
         }
@@ -90,7 +93,12 @@ class FCMService {
     private async handleLogcatRequest() {
         console.log('[FCM] Logcat request received - will implement capture');
         // This will be implemented in LogcatCapture.ts
-        // For now, just log that we received the command
+    }
+
+    private async handleRecordingRequest() {
+        console.log('[FCM] Recording request received - waking up camera');
+        // TODO: Implement actual camera wake up and recording start logic
+        // This requires permissions and foreground service management
     }
 }
 
