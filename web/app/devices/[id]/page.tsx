@@ -19,6 +19,31 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
         notFound()
     }
 
+    const lastSeenDate = new Date(device.lastSeen);
+    const diffMs = Date.now() - lastSeenDate.getTime();
+    const diffMin = diffMs / (1000 * 60);
+    const diffDay = diffMs / (1000 * 60 * 60 * 24);
+
+    let statusLabel = 'Desconectado';
+    let statusColor = 'bg-red-500/20 text-red-400 border-red-500/30';
+    let statusDot = 'bg-red-400';
+    let showMetrics = true;
+
+    if (diffMin < 1) {
+        statusLabel = 'En línea';
+        statusColor = 'bg-green-500/20 text-green-400 border-green-500/30';
+        statusDot = 'bg-green-400';
+    } else if (diffDay < 1) {
+        statusLabel = 'Inactivo';
+        statusColor = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+        statusDot = 'bg-yellow-400';
+    } else {
+        statusLabel = 'Desconectado';
+        statusColor = 'bg-red-500/20 text-red-400 border-red-500/30';
+        statusDot = 'bg-red-400';
+        showMetrics = false;
+    }
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
             {/* Header */}
@@ -49,13 +74,10 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                         <div className="flex items-center gap-4">
                             <DeviceActions deviceId={id} />
                             <span
-                                className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${device.status === 'online'
-                                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                    }`}
+                                className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${statusColor}`}
                             >
-                                <div className={`w-2 h-2 rounded-full ${device.status === 'online' ? 'bg-green-400' : 'bg-red-400'}`}></div>
-                                {device.status === 'online' ? 'En línea' : 'Desconectado'}
+                                <div className={`w-2 h-2 rounded-full ${statusDot}`}></div>
+                                {statusLabel}
                             </span>
                         </div>
                     </div>
@@ -68,32 +90,42 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                     {/* Device Info */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Metrics Cards */}
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="text-xs text-slate-400">Batería</h3>
-                                    {device.isCharging && (
-                                        <BatteryCharging className="w-4 h-4 text-yellow-500 animate-pulse" />
-                                    )}
+                        {showMetrics ? (
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-xs text-slate-400">Batería</h3>
+                                        {device.isCharging && (
+                                            <BatteryCharging className="w-4 h-4 text-yellow-500 animate-pulse" />
+                                        )}
+                                    </div>
+                                    <div className="text-2xl font-bold text-white">{Math.round(device.battery * 100)}%</div>
                                 </div>
-                                <div className="text-2xl font-bold text-white">{Math.round(device.battery * 100)}%</div>
-                            </div>
 
-                            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
-                                <h3 className="text-xs text-slate-400 mb-2">CPU</h3>
-                                <div className="text-2xl font-bold text-white">{device.cpu?.toFixed(1)}%</div>
-                            </div>
+                                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
+                                    <h3 className="text-xs text-slate-400 mb-2">CPU</h3>
+                                    <div className="text-2xl font-bold text-white">{device.cpu?.toFixed(1)}%</div>
+                                </div>
 
-                            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
-                                <h3 className="text-xs text-slate-400 mb-2">RAM</h3>
-                                <div className="text-2xl font-bold text-white">{device.ram?.toFixed(0)} MB</div>
-                            </div>
+                                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
+                                    <h3 className="text-xs text-slate-400 mb-2">RAM</h3>
+                                    <div className="text-2xl font-bold text-white">{device.ram?.toFixed(0)} MB</div>
+                                </div>
 
-                            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
-                                <h3 className="text-xs text-slate-400 mb-2">Android</h3>
-                                <div className="text-2xl font-bold text-white">v{device.androidVersion}</div>
+                                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
+                                    <h3 className="text-xs text-slate-400 mb-2">Android</h3>
+                                    <div className="text-2xl font-bold text-white">v{device.androidVersion}</div>
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-xl p-8 flex flex-col items-center justify-center text-slate-500 gap-2">
+                                <div className="p-3 bg-slate-800 rounded-full">
+                                    <Radio className="w-6 h-6 opacity-20" />
+                                </div>
+                                <p className="text-sm italic text-center">Sin telemetría reciente disponible</p>
+                                <p className="text-[10px] uppercase tracking-widest opacity-50 text-center">El dispositivo lleva más de 24h sin conexión</p>
+                            </div>
+                        )}
 
                         {/* Views (Live / History) */}
                         <DeviceViews deviceId={id} />
