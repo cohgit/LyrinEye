@@ -62,16 +62,6 @@ resource "azurerm_storage_table" "userdevices" {
   storage_account_name = azurerm_storage_account.main.name
 }
 
-resource "azurerm_storage_table" "devicetokens" {
-  name                 = "devicetokens"
-  storage_account_name = azurerm_storage_account.main.name
-}
-
-resource "azurerm_storage_table" "logcat" {
-  name                 = "logcat"
-  storage_account_name = azurerm_storage_account.main.name
-}
-
 resource "azurerm_storage_container" "recordings" {
   name                  = "recordings"
   storage_account_name  = azurerm_storage_account.main.name
@@ -93,6 +83,10 @@ resource "azurerm_container_app" "backend" {
   resource_group_name          = azurerm_resource_group.main.name
   revision_mode                = "Single"
 
+  identity {
+    type = "SystemAssigned"
+  }
+
   template {
     container {
       name   = "backend"
@@ -103,6 +97,16 @@ resource "azurerm_container_app" "backend" {
       env {
         name  = "STORAGE_CONNECTION_STRING"
         value = azurerm_storage_account.main.primary_connection_string
+      }
+
+      env {
+        name  = "LOG_ANALYTICS_WORKSPACE_ID"
+        value = azurerm_log_analytics_workspace.main.workspace_id
+      }
+
+      env {
+        name  = "LOG_ANALYTICS_SHARED_KEY"
+        value = azurerm_log_analytics_workspace.main.primary_shared_key
       }
     }
 
@@ -118,4 +122,11 @@ resource "azurerm_container_app" "backend" {
       latest_revision = true
     }
   }
+}
+
+# --- Permissions for Querying Log Analytics ---
+resource "azurerm_role_assignment" "backend_log_reader" {
+  scope                = azurerm_log_analytics_workspace.main.id
+  role_definition_name = "Log Analytics Reader"
+  principal_id         = azurerm_container_app.backend.identity[0].principal_id
 }

@@ -9,7 +9,7 @@ resource "azurerm_static_web_app" "web" {
   # App settings (environment variables)
   app_settings = {
     NEXTAUTH_URL    = "https://${var.project_name}-${var.environment}-web.azurestaticapps.net"
-    BACKEND_API_URL = azurerm_container_app.backend.latest_revision_fqdn
+    BACKEND_API_URL = "https://${azurerm_container_app.backend.ingress[0].fqdn}"
   }
 
   tags = {

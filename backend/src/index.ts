@@ -31,7 +31,7 @@ const deviceTokensClient = TableClient.fromConnectionString(CONNECTION_STRING, '
 
 // Firebase and Logcat Services
 import { initializeFirebase, sendPushNotification } from './FirebaseService';
-import { initializeLogcatTable, receiveLogcat, LogcatEntry } from './LogcatService';
+import * as LogcatService from './LogcatService';
 
 // Ensure resources exist
 async function initStorage() {
@@ -52,7 +52,7 @@ async function initStorage() {
             if (e.statusCode !== 409) throw e;
         });
 
-        await initializeLogcatTable();
+        await LogcatService.initializeLogcatTable();
         initializeFirebase();
 
         console.log('Azure Storage resources ready.');
@@ -364,6 +364,21 @@ app.post('/api/devices/register-token', async (req, res) => {
 });
 
 // Send Remote Command to Device
+app.get('/api/devices/:id/logs', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { query, timespan } = req.query;
+        const logs = await LogcatService.queryLogs(
+            id,
+            query as string,
+            timespan as string || 'PT1H'
+        );
+        res.send(logs);
+    } catch (error: any) {
+        res.status(500).send({ error: error.message });
+    }
+});
+
 app.post('/api/devices/:id/commands', async (req, res) => {
     try {
         const { id: deviceId } = req.params;
@@ -406,7 +421,7 @@ app.post('/api/devices/:id/logcat', async (req, res) => {
             return res.status(400).send({ error: 'logs must be an array' });
         }
 
-        await receiveLogcat(deviceId, logs as LogcatEntry[]);
+        await LogcatService.receiveLogcat(deviceId, logs as LogcatService.LogcatEntry[]);
         res.send({ status: 'received', count: logs.length });
     } catch (error: any) {
         console.error(`[LOGCAT] Failed to receive logs:`, error);
