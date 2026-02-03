@@ -414,15 +414,17 @@ app.get('/api/devices/:id', async (req, res) => {
         // For now, we return the session status and some default/mock values
         // that the frontend might override with real telemetry if available via other means.
 
+        const isTransmitting = LogcatService.isSessionActive(deviceId);
+
         res.send({
             id: deviceId,
-            name: deviceId, // Default name
-            status: 'online', // We assume online if we can query it, or improve logic later
-            lastSeen: new Date().toISOString(),
+            name: deviceId,
+            status: 'online',
+            lastSeen: isTransmitting ? new Date().toISOString() : new Date().toISOString(), // Still using now for online assumption, but could improve
             isTransmitting: isTransmitting,
-            isRecording: false, // Default false until we track recording state similarly
-            battery: 0.8, // Mock
-            isCharging: true, // Mock
+            isRecording: false,
+            battery: 0.8,
+            isCharging: true,
             cpu: 15,
             ram: 512,
             androidVersion: '13',

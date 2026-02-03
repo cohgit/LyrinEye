@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import DeviceViews from "@/app/components/DeviceViews"
 import DeviceActions from "@/app/components/DeviceActions"
+import TimeDisplay from "@/app/components/TimeDisplay"
 import { Wifi, Radio, BatteryCharging } from "lucide-react"
 
 export default async function DevicePage({ params }: { params: Promise<{ id: string }> }) {
@@ -120,10 +121,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                                 <div>
                                     <dt className="text-sm text-slate-400">Última actividad</dt>
                                     <dd className="text-sm text-white mt-1">
-                                        {formatDistanceToNow(new Date(device.lastSeen), {
-                                            addSuffix: true,
-                                            locale: es,
-                                        })}
+                                        <TimeDisplay date={device.lastSeen} />
                                     </dd>
                                 </div>
                             </dl>
