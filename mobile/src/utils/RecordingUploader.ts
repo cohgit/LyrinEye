@@ -80,7 +80,7 @@ class RecordingUploadService {
                     thumbnailBlobName: thumbnailBlobName,
                     timestamp: new Date().toISOString(),
                     duration: durationSec,
-                    roomId: 'default-room',
+                    roomId: await DeviceInfo.getUniqueId(),
                     deviceId: await DeviceInfo.getUniqueId(),
                     wifiSSID: (netState.details as any)?.ssid || null,
                     appVersion: `${DeviceInfo.getVersion()}.${DeviceInfo.getBuildNumber()}`,
@@ -215,6 +215,7 @@ class RecordingUploadService {
             'Content-Type': 'video/mp4',
         }, ReactNativeBlobUtil.wrap(filePath));
 
+        const netState = await NetInfo.fetch();
         await fetch(`${CONFIG.SIGNALING_SERVER}/recordings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -223,8 +224,11 @@ class RecordingUploadService {
                 thumbnailBlobName: thumbnailBlobName,
                 timestamp: new Date().toISOString(),
                 duration: durationSec,
-                roomId: 'default-room',
-                deviceId: await DeviceInfo.getUniqueId()
+                roomId: await DeviceInfo.getUniqueId(),
+                deviceId: await DeviceInfo.getUniqueId(),
+                wifiSSID: (netState.details as any)?.ssid || null,
+                appVersion: `${DeviceInfo.getVersion()}.${DeviceInfo.getBuildNumber()}`,
+                androidVersion: DeviceInfo.getSystemVersion()
             })
         });
 

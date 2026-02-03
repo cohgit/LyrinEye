@@ -206,7 +206,7 @@ export async function getLogStats(deviceId: string, start: string, end: string, 
                 // Filter by PartitionKey and timestamp range (using lowercase 'timestamp' field)
                 const entities = recordingsTableClient.listEntities({
                     queryOptions: {
-                        filter: `PartitionKey eq '${deviceId}' and timestamp ge datetime'${start}' and timestamp le datetime'${end}'`
+                        filter: `deviceId eq '${deviceId}' and timestamp ge datetime'${start}' and timestamp le datetime'${end}'`
                     }
                 });
                 for await (const entity of entities) {
