@@ -10,7 +10,7 @@ class FCMService {
 
     async init() {
         try {
-            this.deviceId = await DeviceInfo.getDeviceName();
+            this.deviceId = await DeviceInfo.getUniqueId();
 
             // Request notification permission (iOS requires this, Android for API 33+)
             const authStatus = await messaging().requestPermission();

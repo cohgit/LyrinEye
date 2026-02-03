@@ -226,6 +226,7 @@ app.post('/recordings', async (req, res) => {
                         partitionKey: entity.partitionKey as string,
                         rowKey: entity.rowKey as string,
                         registeredAt: new Date().toISOString(), // This is our 'lastSeen'
+                        lastRecordingAt: new Date().toISOString(),
                         wifiSSID: wifiSSID || entity.wifiSSID || null,
                         appVersion: appVersion || entity.appVersion || null,
                         androidVersion: androidVersion || entity.androidVersion || null
@@ -409,6 +410,14 @@ app.get('/api/devices', async (req, res) => {
         const devices = [];
         for await (const entity of deviceEntities) {
             const isTransmitting = LogcatService.isSessionActive(entity.rowKey as string);
+
+            // Recording status: was there an upload in the last 2 minutes?
+            let isRecording = false;
+            if (entity.lastRecordingAt) {
+                const lastRec = new Date(entity.lastRecordingAt as string).getTime();
+                isRecording = (Date.now() - lastRec) < 120000;
+            }
+
             devices.push({
                 id: entity.rowKey,
                 name: entity.name || (entity.rowKey as string).substring(0, 8),
@@ -416,11 +425,13 @@ app.get('/api/devices', async (req, res) => {
                 battery: 0.8,
                 cpu: 10,
                 ram: 512,
-                lastSeen: isTransmitting ? new Date().toISOString() : (entity.registeredAt || new Date().toISOString()),
+                lastSeen: isTransmitting || isRecording ? new Date().toISOString() : (entity.registeredAt || new Date().toISOString()),
                 isCharging: false,
                 isTransmitting: isTransmitting,
-                isRecording: false,
-                wifiSSID: entity.wifiSSID || null
+                isRecording: isRecording,
+                wifiSSID: entity.wifiSSID || null,
+                appVersion: entity.appVersion || null,
+                androidVersion: entity.androidVersion || null
             });
         }
 
@@ -532,11 +543,16 @@ app.post('/api/devices/:id/commands', async (req, res) => {
         console.log(`[COMMAND] Sending '${command}' to device ${deviceId}`);
 
         // Get device FCM token
-        const tokenEntity = await deviceTokensClient.getEntity(deviceId, 'fcm');
-        const fcmToken = tokenEntity.token as string;
-
-        if (!fcmToken) {
-            return res.status(404).send({ error: 'Device token not found' });
+        let fcmToken: string;
+        try {
+            const tokenEntity = await deviceTokensClient.getEntity(deviceId, 'fcm');
+            fcmToken = tokenEntity.token as string;
+        } catch (e: any) {
+            console.error(`[COMMAND] Token not found for ${deviceId}:`, e.message);
+            return res.status(404).send({
+                error: 'Device token not found',
+                message: 'El dispositivo no ha registrado su token de notificaciones or el ID es incorrecto.'
+            });
         }
 
         // Send push notification
