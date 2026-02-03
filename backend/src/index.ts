@@ -627,6 +627,21 @@ app.post('/api/devices/:id/logcat', async (req, res) => {
     }
 });
 
+app.post('/api/web/logs', async (req, res) => {
+    try {
+        const { logs, source } = req.body;
+        if (Array.isArray(logs)) {
+            await LogcatService.receiveWebLogs(logs, source);
+            res.send({ status: 'ok' });
+        } else {
+            res.status(400).send({ error: 'logs must be an array' });
+        }
+    } catch (error: any) {
+        console.error('Failed to ingest web logs:', error);
+        res.status(500).send({ error: error.message });
+    }
+});
+
 app.get('/health', (req, res) => {
     res.send({ status: 'ok', rooms: rooms.size });
 });

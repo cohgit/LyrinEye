@@ -136,7 +136,53 @@ async function forwardToAzureLogAnalytics(deviceId: string, logs: LogcatEntry[])
 
         console.log(`[LOGCAT] Successfully forwarded ${logs.length} logs to Log Analytics`);
     } catch (error: any) {
+    } catch (error: any) {
         console.error('[LOGCAT] Error forwarding to Log Analytics:', error.response?.data || error.message);
+    }
+}
+
+export async function receiveWebLogs(logs: any[], source: string = 'web') {
+    if (!WORKSPACE_ID || !SHARED_KEY) {
+        console.warn('[WEB-LOGS] No Azure Log Analytics credentials configured');
+        return;
+    }
+
+    try {
+        const logName = 'LyrinEyeWeb';
+        const date = new Date().toUTCString();
+
+        // Prepare data for ingestion
+        const data = logs.map(l => ({
+            ...l,
+            Source: source,
+            TimeGenerated: new Date().toISOString()
+        }));
+
+        const body = JSON.stringify(data);
+        const contentLength = Buffer.byteLength(body);
+        const stringToSign = `POST\n${contentLength}\napplication/json\nx-ms-date:${date}\n/api/logs`;
+        const signature = crypto.createHmac('sha256', Buffer.from(SHARED_KEY, 'base64'))
+            .update(stringToSign, 'utf-8')
+            .digest('base64');
+
+        const authorization = `SharedKey ${WORKSPACE_ID}:${signature}`;
+
+        const host = `${WORKSPACE_ID}.ods.opinsights.azure.com`;
+        const url = `https://${host}/api/logs?api-version=2016-04-01`;
+
+        await axios.post(url, body, {
+            headers: {
+                'content-type': 'application/json',
+                'Authorization': authorization,
+                'Log-Type': logName, // This will appear as LyrinEyeWeb_CL
+                'x-ms-date': date,
+                'time-generated-field': 'TimeGenerated'
+            }
+        });
+
+        console.log(`[WEB-LOGS] Successfully forwarded ${logs.length} logs to Log Analytics`);
+    } catch (error: any) {
+        console.error('[WEB-LOGS] Error forwarding to Log Analytics:', error.response?.data || error.message);
     }
 }
 
