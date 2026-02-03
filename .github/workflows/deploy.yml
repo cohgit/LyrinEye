@@ -71,7 +71,8 @@ jobs:
         echo "## 🚀 LyrinEye Infrastructure Deployed!" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 🔗 Access Details" >> $GITHUB_STEP_SUMMARY
-        echo "- **Backend URL**: $(terraform output -raw backend_url)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Backend API**: $(terraform output -raw backend_url)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Web Admin Panel**: $(terraform output -raw web_panel_url)" >> $GITHUB_STEP_SUMMARY
         echo "- **Storage Account**: $(terraform output -raw storage_account_name)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "💰 **Cost Strategy**: Zero-cost (Consumption Plan)" >> $GITHUB_STEP_SUMMARY
+        echo "💰 **Cost Strategy**: Zero-cost (Free tier)" >> $GITHUB_STEP_SUMMARY

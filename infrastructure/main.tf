@@ -14,7 +14,7 @@ terraform {
 
 provider "azurerm" {
   features {}
-  
+
   use_oidc                   = true
   use_cli                    = false
   skip_provider_registration = false
@@ -62,6 +62,16 @@ resource "azurerm_storage_table" "userdevices" {
   storage_account_name = azurerm_storage_account.main.name
 }
 
+resource "azurerm_storage_table" "devicetokens" {
+  name                 = "devicetokens"
+  storage_account_name = azurerm_storage_account.main.name
+}
+
+resource "azurerm_storage_table" "logcat" {
+  name                 = "logcat"
+  storage_account_name = azurerm_storage_account.main.name
+}
+
 resource "azurerm_storage_container" "recordings" {
   name                  = "recordings"
   storage_account_name  = azurerm_storage_account.main.name
@@ -95,7 +105,7 @@ resource "azurerm_container_app" "backend" {
         value = azurerm_storage_account.main.primary_connection_string
       }
     }
-    
+
     min_replicas = 0
     max_replicas = 2
   }
