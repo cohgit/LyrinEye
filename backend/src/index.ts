@@ -363,6 +363,45 @@ app.post('/api/devices/register-token', async (req, res) => {
     }
 });
 
+// List Devices for a User
+app.get('/api/devices', async (req, res) => {
+    try {
+        const email = req.query.email as string;
+        if (!email) {
+            return res.status(400).send({ error: 'Email is required to list devices' });
+        }
+
+        const normalizedEmail = email.toLowerCase();
+        console.log(`[DEVICES] Fetching devices for user: ${normalizedEmail}`);
+
+        const deviceEntities = userDevicesClient.listEntities({
+            queryOptions: { filter: `PartitionKey eq '${normalizedEmail}'` }
+        });
+
+        const devices = [];
+        for await (const entity of deviceEntities) {
+            // We can enrich this later with real-time status from memory sessions
+            devices.push({
+                id: entity.rowKey,
+                name: entity.name || (entity.rowKey as string).substring(0, 8),
+                status: 'online', // Mock for now, will improve later
+                battery: 0.8,
+                cpu: 10,
+                ram: 512,
+                lastSeen: entity.registeredAt || new Date().toISOString(),
+                isCharging: false,
+                isTransmitting: LogcatService.isSessionActive(entity.rowKey as string),
+                isRecording: false
+            });
+        }
+
+        res.send(devices);
+    } catch (error: any) {
+        console.error(`[DEVICES] Failed to list devices:`, error);
+        res.status(500).send({ error: error.message });
+    }
+});
+
 // Get Device Details
 app.get('/api/devices/:id', async (req, res) => {
     try {

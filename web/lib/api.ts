@@ -3,9 +3,10 @@ import { Device, DeviceDetail } from '@/types/device'
 
 const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://localhost:8080'
 
-export async function getDevices(): Promise<Device[]> {
+export async function getDevices(email?: string): Promise<Device[]> {
     try {
         const response = await axios.get(`${BACKEND_API_URL}/api/devices`, {
+            params: { email },
             timeout: 5000
         });
         return response.data;
