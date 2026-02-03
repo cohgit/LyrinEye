@@ -47,12 +47,12 @@ export async function getDeviceDetails(deviceId: string): Promise<DeviceDetail |
             cpu: 12.5,
             ram: 450,
             isCharging: false,
-            isTransmitting: false,
-            isRecording: false,
+            isTransmitting: false, // Added property
+            isRecording: false,    // Added property
             androidVersion: '13',
             appVersion: 'v1.0.0',
             wifiSSID: 'LyrinEye_Secure',
-            telemetry: [],
+            telemetry: [],         // Ensure this matches types
             location: {
                 latitude: -33.45,
                 longitude: -70.66
