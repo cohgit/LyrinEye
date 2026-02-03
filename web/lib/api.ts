@@ -22,6 +22,8 @@ export async function getDevices(): Promise<Device[]> {
                 cpu: 12.5,
                 ram: 450,
                 isCharging: false,
+                isTransmitting: false,
+                isRecording: false
             },
         ];
     }
@@ -45,6 +47,8 @@ export async function getDeviceDetails(deviceId: string): Promise<DeviceDetail |
             cpu: 12.5,
             ram: 450,
             isCharging: false,
+            isTransmitting: false,
+            isRecording: false,
             androidVersion: '13',
             appVersion: 'v1.0.0',
             wifiSSID: 'LyrinEye_Secure',

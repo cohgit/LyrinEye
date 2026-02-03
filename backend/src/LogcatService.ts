@@ -172,7 +172,7 @@ export async function queryLogs(deviceId: string, kqlQuery?: string, timespan: s
         return [];
     }
 }
-}
+
 
 export async function getLogStats(deviceId: string, start: string, end: string, granularity: '1d' | '1h' | '1m') {
     if (!WORKSPACE_ID) return [];
