@@ -124,11 +124,9 @@ resource "azurerm_container_app" "backend" {
   }
 }
 
-/*
 # --- Permissions for Querying Log Analytics ---
 resource "azurerm_role_assignment" "backend_log_reader" {
   scope                = azurerm_log_analytics_workspace.main.id
   role_definition_name = "Log Analytics Reader"
   principal_id         = azurerm_container_app.backend.identity[0].principal_id
 }
-*/
