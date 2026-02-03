@@ -54,8 +54,8 @@ export default async function DashboardPage() {
                                 <h3 className="text-lg font-semibold text-white">{device.name}</h3>
                                 <span
                                     className={`px-3 py-1 rounded-full text-xs font-medium ${device.status === 'online'
-                                            ? 'bg-green-500/20 text-green-400'
-                                            : 'bg-red-500/20 text-red-400'
+                                        ? 'bg-green-500/20 text-green-400'
+                                        : 'bg-red-500/20 text-red-400'
                                         }`}
                                 >
                                     {device.status === 'online' ? 'En línea' : 'Desconectado'}
@@ -70,10 +70,10 @@ export default async function DashboardPage() {
                                         <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
                                             <div
                                                 className={`h-full ${device.battery > 0.5
-                                                        ? 'bg-green-500'
-                                                        : device.battery > 0.2
-                                                            ? 'bg-yellow-500'
-                                                            : 'bg-red-500'
+                                                    ? 'bg-green-500'
+                                                    : device.battery > 0.2
+                                                        ? 'bg-yellow-500'
+                                                        : 'bg-red-500'
                                                     }`}
                                                 style={{ width: `${device.battery * 100}%` }}
                                             />
@@ -118,3 +118,5 @@ export default async function DashboardPage() {
         </div>
     )
 }
+
+// Force refresh git tracking
