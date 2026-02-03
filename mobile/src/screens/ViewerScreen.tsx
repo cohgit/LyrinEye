@@ -371,37 +371,50 @@ const ViewerScreen = ({ navigation }: any) => {
 
                     {selectedVideo ? (
                         <View style={styles.playerContainer}>
+                            {/* Metadata and Controls Header */}
+                            <View style={styles.playerHeader}>
+                                <View style={styles.metadataContainer}>
+                                    <Text style={styles.metadataTitle}>
+                                        {formatDate(filteredRecordings.find(r => r.url === selectedVideo)?.timestamp || '')}
+                                    </Text>
+                                    <Text style={styles.metadataSubtitle}>
+                                        {filteredRecordings.find(r => r.url === selectedVideo)?.deviceId || 'Unknown Device'}
+                                    </Text>
+                                </View>
+
+                                <View style={styles.topControls}>
+                                    <TouchableOpacity
+                                        style={[styles.controlButton, filteredRecordings.findIndex(r => r.url === selectedVideo) >= filteredRecordings.length - 1 && styles.disabledControl]}
+                                        onPress={skipToPrev}
+                                        disabled={filteredRecordings.findIndex(r => r.url === selectedVideo) >= filteredRecordings.length - 1}
+                                    >
+                                        <Text style={styles.controlText}>⏮️</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={styles.rotateButton}
+                                        onPress={() => setRotation(prev => (prev + 90) % 360)}
+                                    >
+                                        <Text style={{ fontSize: 18 }}>🔄</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={[styles.controlButton, filteredRecordings.findIndex(r => r.url === selectedVideo) <= 0 && styles.disabledControl]}
+                                        onPress={skipToNext}
+                                        disabled={filteredRecordings.findIndex(r => r.url === selectedVideo) <= 0}
+                                    >
+                                        <Text style={styles.controlText}>⏭️</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
                             <Video
                                 source={{ uri: selectedVideo }}
                                 style={[styles.fullVideo, { transform: [{ rotate: `${rotation}deg` }] }]}
                                 controls={true}
                                 resizeMode="contain"
+                                onEnd={skipToNext}
                             />
-
-                            {/* Player Overlays */}
-                            <TouchableOpacity
-                                style={styles.rotateButton}
-                                onPress={() => setRotation(prev => (prev + 90) % 360)}
-                            >
-                                <Text style={{ fontSize: 20 }}>🔄</Text>
-                            </TouchableOpacity>
-
-                            <View style={styles.skipControls}>
-                                <TouchableOpacity
-                                    style={[styles.skipButton, filteredRecordings.findIndex(r => r.url === selectedVideo) >= filteredRecordings.length - 1 && styles.disabledSkip]}
-                                    onPress={skipToPrev}
-                                    disabled={filteredRecordings.findIndex(r => r.url === selectedVideo) >= filteredRecordings.length - 1}
-                                >
-                                    <Text style={styles.skipText}>⏮️ Ant</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.skipButton, filteredRecordings.findIndex(r => r.url === selectedVideo) <= 0 && styles.disabledSkip]}
-                                    onPress={skipToNext}
-                                    disabled={filteredRecordings.findIndex(r => r.url === selectedVideo) <= 0}
-                                >
-                                    <Text style={styles.skipText}>Sig ⏭️</Text>
-                                </TouchableOpacity>
-                            </View>
 
                             <TouchableOpacity
                                 style={styles.closePlayer}
@@ -503,43 +516,52 @@ const styles = StyleSheet.create({
     recordingDetails: { color: '#64748B', fontSize: 12, marginTop: 4 },
     playerContainer: { flex: 1, backgroundColor: '#000' },
     closePlayer: { position: 'absolute', bottom: 40, alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
-    closePlayerText: { color: '#FFF', fontWeight: '600' },
-    rotateButton: { position: 'absolute', top: 20, right: 20, backgroundColor: 'rgba(255,255,255,0.3)', padding: 10, borderRadius: 25, zIndex: 100 },
-    footer: { padding: 16 },
-    backButton: { padding: 16, alignItems: 'center' },
-    backButtonText: { color: '#64748B', fontSize: 14, fontWeight: '600' },
-    filterRow: { maxHeight: 50, marginBottom: 8 },
-    filterContent: { paddingHorizontal: 16, gap: 8 },
-    filterChip: { backgroundColor: '#1E293B', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#334155' },
-    activeFilter: { backgroundColor: '#0EA5E9', borderColor: '#0EA5E9' },
-    filterText: { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
-    activeFilterText: { color: '#FFF' },
-    thumbnail: { width: '100%', height: '100%', borderRadius: 12 },
-    skipControls: {
+    playerHeader: {
         position: 'absolute',
-        top: '50%',
+        top: 0,
         left: 0,
         right: 0,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        padding: 16,
+        paddingTop: 40, // Status bar safe area approx if needed, or rely on SafeAreaView
         flexDirection: 'row',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        marginTop: -30,
+        alignItems: 'center',
+        zIndex: 10,
     },
-    skipButton: {
-        backgroundColor: 'rgba(30, 41, 59, 0.7)',
-        paddingHorizontal: 16,
-        paddingVertical: 10,
+    metadataContainer: {
+        flex: 1,
+    },
+    metadataTitle: {
+        color: '#FFF',
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
+    metadataSubtitle: {
+        color: '#94A3B8',
+        fontSize: 12,
+    },
+    topControls: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12, // React Native 0.71+ supports gap
+    },
+    controlButton: {
+        padding: 8,
+        backgroundColor: 'rgba(255,255,255,0.1)',
         borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.2)',
     },
-    disabledSkip: {
+    disabledControl: {
         opacity: 0.3,
     },
-    skipText: {
-        color: '#FFF',
-        fontWeight: '700',
-        fontSize: 14,
+    controlText: {
+        fontSize: 18,
+    },
+    // Updated rotateButton to fit in row, removed absolute positioning
+    rotateButton: {
+        padding: 8,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 20,
     },
 });
 
