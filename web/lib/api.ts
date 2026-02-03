@@ -1,11 +1,20 @@
 import axios from 'axios'
 import { Device, DeviceDetail } from '@/types/device'
 
-const BACKEND_API_URL = process.env.BACKEND_API_URL || 'http://localhost:8080'
+const isServer = typeof window === 'undefined';
+const BACKEND_API_URL = isServer
+    ? (process.env.BACKEND_API_URL || 'http://localhost:8080')
+    : ''; // Empty string in client means use relative path
+
+// Helper to determine the corrected base URL
+const getBaseUrl = () => {
+    if (isServer) return BACKEND_API_URL;
+    return '/api/proxy'; // Relative path to our local proxy
+};
 
 export async function getDevices(email?: string): Promise<Device[]> {
     try {
-        const response = await axios.get(`${BACKEND_API_URL}/api/devices`, {
+        const response = await axios.get(`${getBaseUrl()}/api/devices`, {
             params: { email },
             timeout: 5000
         });
@@ -32,7 +41,7 @@ export async function getDevices(email?: string): Promise<Device[]> {
 
 export async function getDeviceDetails(deviceId: string): Promise<DeviceDetail | null> {
     try {
-        const response = await axios.get(`${BACKEND_API_URL}/api/devices/${deviceId}`, {
+        const response = await axios.get(`${getBaseUrl()}/api/devices/${deviceId}`, {
             timeout: 5000
         });
         return response.data;
@@ -64,7 +73,7 @@ export async function getDeviceDetails(deviceId: string): Promise<DeviceDetail |
 
 export async function sendPushCommand(deviceId: string, command: string) {
     const response = await axios.post(
-        `${BACKEND_API_URL}/api/devices/${deviceId}/commands`,
+        `${getBaseUrl()}/api/devices/${deviceId}/commands`,
         { command }
     )
     return response.data
@@ -77,7 +86,7 @@ export async function getLogStats(
     granularity: '1d' | '1h' | '1m'
 ) {
     try {
-        const response = await axios.get(`${BACKEND_API_URL}/api/devices/${deviceId}/stats/logs`, {
+        const response = await axios.get(`${getBaseUrl()}/api/devices/${deviceId}/stats/logs`, {
             params: { start, end, granularity }
         });
         return response.data;
