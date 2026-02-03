@@ -6,9 +6,10 @@ import { sendPushCommand } from '@/lib/api'
 
 interface DeviceActionsProps {
     deviceId: string
+    isEnabled?: boolean
 }
 
-export default function DeviceActions({ deviceId }: DeviceActionsProps) {
+export default function DeviceActions({ deviceId, isEnabled = true }: DeviceActionsProps) {
     const [loading, setLoading] = useState(false)
     const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle')
 
@@ -32,7 +33,7 @@ export default function DeviceActions({ deviceId }: DeviceActionsProps) {
         <div className="flex items-center gap-2">
             <button
                 onClick={handleStartRecording}
-                disabled={loading}
+                disabled={loading || !isEnabled}
                 className={`
                     flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all
                     ${status === 'success'

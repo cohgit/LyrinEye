@@ -72,7 +72,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                             <p className="text-sm text-slate-400">{device.appVersion}</p>
                         </div>
                         <div className="flex items-center gap-4">
-                            <DeviceActions deviceId={id} />
+                            <DeviceActions deviceId={id} isEnabled={showMetrics} />
                             <span
                                 className={`px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 ${statusColor}`}
                             >
@@ -128,7 +128,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                         )}
 
                         {/* Views (Live / History) */}
-                        <DeviceViews deviceId={id} />
+                        <DeviceViews deviceId={id} isLiveEnabled={showMetrics} />
                     </div>
 
                     {/* Sidebar */}
@@ -140,7 +140,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                                     <dt className="text-sm text-slate-400 flex items-center gap-2">
                                         <Wifi className="w-4 h-4" /> WiFi
                                     </dt>
-                                    <dd className="text-sm text-white mt-1">{device.wifiSSID}</dd>
+                                    <dd className="text-sm text-white mt-1">{device.wifiSSID || 'No disponible'}</dd>
                                 </div>
                                 {device.location && (
                                     <div>

@@ -391,7 +391,8 @@ app.get('/api/devices', async (req, res) => {
                 lastSeen: isTransmitting ? new Date().toISOString() : (entity.registeredAt || new Date().toISOString()),
                 isCharging: false,
                 isTransmitting: isTransmitting,
-                isRecording: false
+                isRecording: false,
+                wifiSSID: entity.wifiSSID || null
             });
         }
 
@@ -434,9 +435,9 @@ app.get('/api/devices/:id', async (req, res) => {
                 isCharging: true,
                 cpu: 15,
                 ram: 512,
-                androidVersion: '13',
-                appVersion: '1.0.0',
-                wifiSSID: 'LyrinEye_WiFi'
+                androidVersion: '?',
+                appVersion: '?',
+                wifiSSID: null
             });
         }
 
@@ -451,9 +452,9 @@ app.get('/api/devices/:id', async (req, res) => {
             isCharging: true,
             cpu: 15,
             ram: 512,
-            androidVersion: deviceEntity.androidVersion || '13',
-            appVersion: deviceEntity.appVersion || '1.0.0',
-            wifiSSID: deviceEntity.wifiSSID || 'LyrinEye_WiFi'
+            androidVersion: deviceEntity.androidVersion || '?',
+            appVersion: deviceEntity.appVersion || '?',
+            wifiSSID: deviceEntity.wifiSSID || null
         });
     } catch (error: any) {
         console.error(`[DEVICES] Failed to get device details:`, error);
