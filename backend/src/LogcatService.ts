@@ -206,11 +206,20 @@ export async function getLogStats(deviceId: string, start: string, end: string, 
                 // Filter by PartitionKey and timestamp range (using lowercase 'timestamp' field)
                 const entities = recordingsTableClient.listEntities({
                     queryOptions: {
-                        filter: `deviceId eq '${deviceId}' and timestamp ge datetime'${start}' and timestamp le datetime'${end}'`
+                        filter: `deviceId eq '${deviceId}'`
                     }
                 });
+                const startDate = new Date(start);
+                const endDate = new Date(end);
+
                 for await (const entity of entities) {
-                    results.push(entity);
+                    const recTimestamp = (entity.timestamp || entity.Timestamp) as any;
+                    if (recTimestamp) {
+                        const date = new Date(recTimestamp);
+                        if (date >= startDate && date <= endDate) {
+                            results.push({ ...entity, timestamp: date });
+                        }
+                    }
                 }
                 return results;
             } catch (e) {
@@ -241,8 +250,9 @@ export async function getLogStats(deviceId: string, start: string, end: string, 
 
         // Process Recordings from Table Storage
         recordings.forEach((rec: any) => {
-            if (!rec.timestamp) return;
-            const ts = new Date(rec.timestamp);
+            const actualTs = rec.timestamp || rec.Timestamp;
+            if (!actualTs) return;
+            const ts = new Date(actualTs);
             let binDate;
 
             if (granularity === '1d') {

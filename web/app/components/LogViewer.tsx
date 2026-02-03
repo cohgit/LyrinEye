@@ -26,7 +26,7 @@ export default function LogViewer({ deviceId }: LogViewerProps) {
 
     const checkSession = async () => {
         try {
-            const response = await fetch(`/api/proxy/devices/${deviceId}/session`);
+            const response = await fetch(`/api/proxy/api/devices/${deviceId}/session`);
             if (response.ok) {
                 const data = await response.json();
                 setSessionInfo(data.expiresAt ? data : null);
@@ -41,7 +41,7 @@ export default function LogViewer({ deviceId }: LogViewerProps) {
         setIsLoading(true);
         try {
             const q = query ? `| where message contains "${query}" or tag contains "${query}"` : '';
-            const response = await fetch(`/api/proxy/devices/${deviceId}/logs?query=${encodeURIComponent(q)}&timespan=PT1H`);
+            const response = await fetch(`/api/proxy/api/devices/${deviceId}/logs?query=${encodeURIComponent(q)}&timespan=PT1H`);
             if (response.ok) {
                 const data = await response.json();
                 setLogs(data);
@@ -56,7 +56,7 @@ export default function LogViewer({ deviceId }: LogViewerProps) {
     const requestFreshLogs = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch(`/api/proxy/devices/${deviceId}/commands`, {
+            const response = await fetch(`/api/proxy/api/devices/${deviceId}/commands`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ command: 'request_logcat', durationMinutes: duration }),
