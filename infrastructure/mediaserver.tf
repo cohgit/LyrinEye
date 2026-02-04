@@ -132,7 +132,7 @@ resource "azurerm_linux_virtual_machine" "mediasoup" {
 
   admin_ssh_key {
     username   = var.vm_admin_username
-    public_key = file(var.ssh_public_key_path)
+    public_key = var.ssh_public_key
   }
 
   os_disk {
