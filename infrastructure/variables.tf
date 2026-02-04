@@ -50,3 +50,22 @@ variable "google_client_secret" {
   description = "Google OAuth Client Secret"
   sensitive   = true
 }
+
+# Mediasoup SFU Variables
+variable "vm_admin_username" {
+  type        = string
+  description = "Admin username for Mediasoup VM"
+  default     = "azureuser"
+}
+
+variable "ssh_public_key_path" {
+  type        = string
+  description = "Path to SSH public key for VM access"
+  default     = "~/.ssh/id_rsa.pub"
+}
+
+variable "mediasoup_domain" {
+  type        = string
+  description = "Domain name for Mediasoup SFU (e.g., sfu.lyrineye.com)"
+  default     = "sfu.lyrineye.com"
+}

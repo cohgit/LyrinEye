@@ -1,0 +1,166 @@
+#cloud-config
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - build-essential
+  - python3
+  - python3-pip
+  - git
+  - nginx
+  - certbot
+  - python3-certbot-nginx
+  - ufw
+
+# Install Node.js 18.x
+runcmd:
+  # Add NodeSource repository
+  - curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+  - apt-get install -y nodejs
+  
+  # Configure firewall
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw allow 10000:10100/udp
+  - ufw --force enable
+  
+  # Create mediasoup user
+  - useradd -m -s /bin/bash mediasoup
+  - usermod -aG sudo mediasoup
+  
+  # Create directories
+  - mkdir -p /opt/mediasoup-server
+  - mkdir -p /var/log/mediasoup
+  - chown -R mediasoup:mediasoup /opt/mediasoup-server
+  - chown -R mediasoup:mediasoup /var/log/mediasoup
+  
+  # Setup environment variables
+  - echo "DOMAIN_NAME=${domain_name}" >> /etc/environment
+  - echo "AZURE_STORAGE_CONNECTION_STRING='${azure_storage_conn}'" >> /etc/environment
+  - echo "BACKEND_URL=${backend_url}" >> /etc/environment
+  - echo "NODE_ENV=production" >> /etc/environment
+  
+  # Configure Nginx reverse proxy
+  - |
+    cat > /etc/nginx/sites-available/mediasoup <<'EOF'
+    server {
+        listen 80;
+        server_name ${domain_name};
+        
+        location / {
+            return 301 https://$host$request_uri;
+        }
+        
+        location /.well-known/acme-challenge/ {
+            root /var/www/html;
+        }
+    }
+    
+    server {
+        listen 443 ssl http2;
+        server_name ${domain_name};
+        
+        # SSL certificates (will be configured by certbot)
+        ssl_certificate /etc/letsencrypt/live/${domain_name}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/${domain_name}/privkey.pem;
+        
+        # WebSocket support
+        location /socket.io/ {
+            proxy_pass http://localhost:3000;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # WebSocket timeouts
+            proxy_read_timeout 86400;
+            proxy_send_timeout 86400;
+        }
+        
+        location / {
+            proxy_pass http://localhost:3000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+    EOF
+  
+  - ln -sf /etc/nginx/sites-available/mediasoup /etc/nginx/sites-enabled/
+  - rm -f /etc/nginx/sites-enabled/default
+  
+  # Test nginx config and reload
+  - nginx -t && systemctl reload nginx || true
+  
+  # Create systemd service for Mediasoup
+  - |
+    cat > /etc/systemd/system/mediasoup.service <<'EOF'
+    [Unit]
+    Description=Mediasoup SFU Server
+    After=network.target
+    
+    [Service]
+    Type=simple
+    User=mediasoup
+    WorkingDirectory=/opt/mediasoup-server
+    EnvironmentFile=/etc/environment
+    ExecStart=/usr/bin/node dist/server.js
+    Restart=always
+    RestartSec=10
+    StandardOutput=append:/var/log/mediasoup/output.log
+    StandardError=append:/var/log/mediasoup/error.log
+    
+    [Install]
+    WantedBy=multi-user.target
+    EOF
+  
+  - systemctl daemon-reload
+
+write_files:
+  - path: /opt/mediasoup-server/README.md
+    content: |
+      # Mediasoup SFU Server
+      
+      ## Post-Deployment Steps
+      
+      1. **Configure DNS**
+         Point ${domain_name} to this server's IP address
+         
+      2. **Setup SSL Certificate**
+         ```bash
+         sudo certbot --nginx -d ${domain_name} --non-interactive --agree-tos -m admin@lyrineye.com
+         ```
+      
+      3. **Deploy Server Code**
+         The mediasoup server code will be deployed separately
+         
+      4. **Start Service**
+         ```bash
+         sudo systemctl enable mediasoup
+         sudo systemctl start mediasoup
+         ```
+      
+      ## Logs
+      - Output: /var/log/mediasoup/output.log
+      - Errors: /var/log/mediasoup/error.log
+      - Nginx: /var/log/nginx/
+      
+      ## Service Management
+      - Status: sudo systemctl status mediasoup
+      - Restart: sudo systemctl restart mediasoup
+      - Logs: sudo journalctl -u mediasoup -f
+      
+      ## Environment Variables
+      - DOMAIN_NAME: ${domain_name}
+      - BACKEND_URL: ${backend_url}
+      - AZURE_STORAGE_CONNECTION_STRING: (configured)
+    owner: mediasoup:mediasoup
+    permissions: '0644'
+
+final_message: "Mediasoup server base setup complete. Configure DNS and deploy application code."
