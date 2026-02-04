@@ -21,3 +21,9 @@ variable "github_username" {
   description = "GitHub username for GHCR"
   default     = "cohgit"
 }
+
+variable "firebase_service_account_key" {
+  type        = string
+  description = "JSON content of Firebase Service Account Key"
+  sensitive   = true
+}

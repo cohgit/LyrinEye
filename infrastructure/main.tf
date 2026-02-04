@@ -113,6 +113,11 @@ resource "azurerm_container_app" "backend" {
         name  = "LOGCAT_CONCURRENCY_LIMIT"
         value = "1"
       }
+
+      env {
+        name  = "FIREBASE_SERVICE_ACCOUNT_KEY"
+        value = var.firebase_service_account_key
+      }
     }
 
     min_replicas = 0
