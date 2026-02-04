@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getLogStats } from '@/lib/api'
+import { getLogStats, getRecordings, Recording } from '@/lib/api'
+import VideoPlayer from './VideoPlayer'
 import {
     format,
     startOfMonth,
@@ -41,9 +42,14 @@ export default function CalendarView({ deviceId }: CalendarViewProps) {
     const [currentDate, setCurrentDate] = useState(new Date())
     const [stats, setStats] = useState<LogStat[]>([])
     const [loading, setLoading] = useState(false)
+    const [recordings, setRecordings] = useState<Recording[]>([])
+    const [selectedVideo, setSelectedVideo] = useState<Recording | null>(null)
 
     useEffect(() => {
         fetchStats()
+        if (viewMode === 'hour') {
+            fetchRecordings()
+        }
     }, [currentDate, viewMode, deviceId])
 
     const fetchStats = async () => {
@@ -67,6 +73,13 @@ export default function CalendarView({ deviceId }: CalendarViewProps) {
         const data = await getLogStats(deviceId, start, end, granularity)
         setStats(data)
         setLoading(false)
+    }
+
+    const fetchRecordings = async () => {
+        const start = startOfHour(currentDate).toISOString()
+        const end = endOfHour(currentDate).toISOString()
+        const data = await getRecordings(deviceId, start, end)
+        setRecordings(data)
     }
 
     const navigation = {
@@ -233,41 +246,74 @@ export default function CalendarView({ deviceId }: CalendarViewProps) {
         })
 
         return (
-            <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-12 lg:grid-cols-[repeat(15,minmax(0,1fr))] gap-2">
-                {minutes.map(minute => {
-                    const count = getCountForDate(minute)
-                    return (
-                        <div
-                            key={minute.toISOString()}
-                            className={`
-                                aspect-square rounded flex items-center justify-center transition-all
-                                ${count > 0 ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)] scale-110 z-10' : 'bg-slate-800/30'}
-                            `}
-                            title={`${format(minute, 'HH:mm')} - ${count} logs`}
+            <>
+                <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3">
+                    {recordings.map((recording, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => setSelectedVideo(recording)}
+                            className="group relative aspect-video rounded-lg overflow-hidden bg-slate-800 hover:ring-2 hover:ring-indigo-500 transition-all"
                         >
-                            {count > 0 && <Video className="w-3 h-3 text-white" />}
-                        </div>
-                    )
-                })}
-            </div>
+                            {recording.thumbnailUrl ? (
+                                <img
+                                    src={recording.thumbnailUrl}
+                                    alt="Video thumbnail"
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                    <Video className="w-6 h-6 text-slate-600" />
+                                </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center">
+                                        <Video className="w-5 h-5 text-slate-900" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 p-1 bg-gradient-to-t from-black/60 to-transparent">
+                                <p className="text-[10px] text-white font-medium">
+                                    {format(new Date(recording.timestamp), 'HH:mm')}
+                                </p>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+                {recordings.length === 0 && (
+                    <div className="text-center py-12 text-slate-500">
+                        <Video className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                        <p>No hay videos en esta hora</p>
+                    </div>
+                )}
+            </>
         )
     }
 
     return (
-        <div className="bg-slate-900/50 rounded-2xl p-6 border border-slate-800/60 shadow-xl backdrop-blur-sm">
-            {renderHeader()}
+        <>
+            <div className="bg-slate-900/50 rounded-2xl p-6 border border-slate-800/60 shadow-xl backdrop-blur-sm">
+                {renderHeader()}
 
-            <div className="min-h-[400px]">
-                {loading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 z-20 backdrop-blur-[1px] rounded-2xl">
-                        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                )}
+                <div className="min-h-[400px]">
+                    {loading && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-slate-900/50 z-20 backdrop-blur-[1px] rounded-2xl">
+                            <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    )}
 
-                {viewMode === 'month' && renderMonthView()}
-                {viewMode === 'day' && renderDayView()}
-                {viewMode === 'hour' && renderHourView()}
+                    {viewMode === 'month' && renderMonthView()}
+                    {viewMode === 'day' && renderDayView()}
+                    {viewMode === 'hour' && renderHourView()}
+                </div>
             </div>
-        </div>
+            {selectedVideo && (
+                <VideoPlayer
+                    videoUrl={selectedVideo.url}
+                    title={format(new Date(selectedVideo.timestamp), "d 'de' MMMM, HH:mm", { locale: es })}
+                    onClose={() => setSelectedVideo(null)}
+                />
+            )}
+        </>
     )
 }

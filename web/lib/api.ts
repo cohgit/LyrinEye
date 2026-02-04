@@ -105,10 +105,10 @@ export interface Recording {
     size?: number
 }
 
-export async function getRecordings(deviceId: string): Promise<Recording[]> {
+export async function getRecordings(deviceId: string, startTime?: string, endTime?: string): Promise<Recording[]> {
     try {
         const response = await axios.get(`${getBaseUrl()}/api/recordings`, {
-            params: { roomId: deviceId }
+            params: { roomId: deviceId, startTime, endTime }
         });
         return response.data;
     } catch (error) {

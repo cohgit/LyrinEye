@@ -361,7 +361,21 @@ app.get('/api/recordings', async (req, res) => {
             ? list.filter((r: any) => deviceIds.includes(r.deviceId))
             : list;
 
-        res.send(finalResults.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+        // Apply time-range filtering if provided
+        const startTime = req.query.startTime as string;
+        const endTime = req.query.endTime as string;
+
+        let filteredResults = finalResults;
+        if (startTime || endTime) {
+            filteredResults = finalResults.filter((r: any) => {
+                const recordingTime = new Date(r.timestamp).getTime();
+                if (startTime && recordingTime < new Date(startTime).getTime()) return false;
+                if (endTime && recordingTime > new Date(endTime).getTime()) return false;
+                return true;
+            });
+        }
+
+        res.send(filteredResults.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
     } catch (error: any) {
         res.status(500).send({ error: error.message });
     }
