@@ -37,6 +37,7 @@ jobs:
       TF_VAR_nextauth_secret: ${{ secrets.NEXTAUTH_SECRET }}
       TF_VAR_google_client_id: ${{ secrets.GOOGLE_CLIENT_ID }}
       TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+      TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
 
     steps:
     - name: Checkout

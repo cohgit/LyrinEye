@@ -58,10 +58,10 @@ variable "vm_admin_username" {
   default     = "azureuser"
 }
 
-variable "ssh_public_key_path" {
+variable "ssh_public_key" {
   type        = string
-  description = "Path to SSH public key for VM access"
-  default     = "~/.ssh/id_rsa.pub"
+  description = "SSH public key content for VM access"
+  sensitive   = true
 }
 
 variable "mediasoup_domain" {
