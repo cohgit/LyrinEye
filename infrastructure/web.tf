@@ -8,8 +8,14 @@ resource "azurerm_static_web_app" "web" {
 
   # App settings (environment variables)
   app_settings = {
-    NEXTAUTH_URL    = "https://${var.project_name}-${var.environment}-web.azurestaticapps.net"
-    BACKEND_API_URL = "https://${azurerm_container_app.backend.ingress[0].fqdn}"
+    NEXTAUTH_URL       = "https://${var.project_name}-${var.environment}-web.azurestaticapps.net"
+    NEXTAUTH_SECRET    = var.nextauth_secret
+    AUTH_SECRET        = var.nextauth_secret
+    AUTH_URL           = "https://${var.project_name}-${var.environment}-web.azurestaticapps.net"
+    AUTH_TRUST_HOST    = "true"
+    GOOGLE_CLIENT_ID   = var.google_client_id
+    GOOGLE_CLIENT_SECRET = var.google_client_secret
+    BACKEND_API_URL    = "https://${azurerm_container_app.backend.ingress[0].fqdn}"
   }
 
   tags = {

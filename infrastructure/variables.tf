@@ -32,3 +32,21 @@ variable "firebase_service_account_key" {
     error_message = "The firebase_service_account_key variable must not be empty."
   }
 }
+
+variable "nextauth_secret" {
+  type        = string
+  description = "Secret for NextAuth.js encryption"
+  sensitive   = true
+}
+
+variable "google_client_id" {
+  type        = string
+  description = "Google OAuth Client ID"
+  sensitive   = true
+}
+
+variable "google_client_secret" {
+  type        = string
+  description = "Google OAuth Client Secret"
+  sensitive   = true
+}
