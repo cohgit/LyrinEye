@@ -101,7 +101,7 @@ async function forwardToAzureLogAnalytics(deviceId: string, logs: LogcatEntry[])
     }
 
     try {
-        const logName = 'logcat';
+        const logName = 'LyrinEye_Mobile_Log'; // Renamed from logcat
         const date = new Date().toUTCString();
 
         // Prepare data for ingestion
@@ -147,7 +147,7 @@ export async function receiveWebLogs(logs: any[], source: string = 'web') {
     }
 
     try {
-        const logName = 'LyrinEyeWeb';
+        const logName = 'LyrinEye_Web_Log';
         const date = new Date().toUTCString();
 
         // Prepare data for ingestion
@@ -173,7 +173,7 @@ export async function receiveWebLogs(logs: any[], source: string = 'web') {
             headers: {
                 'content-type': 'application/json',
                 'Authorization': authorization,
-                'Log-Type': logName, // This will appear as LyrinEyeWeb_CL
+                'Log-Type': logName, // This will appear as LyrinEye_Web_Log_CL
                 'x-ms-date': date,
                 'time-generated-field': 'TimeGenerated'
             }
@@ -189,9 +189,9 @@ export async function queryLogs(deviceId: string, kqlQuery?: string, timespan: s
     if (!WORKSPACE_ID) return [];
 
     try {
-        // Base query filters by device and the correct log type (appends _CL automatically by Azure)
-        const baseQuery = `logcat_CL | where DeviceName == "${deviceId}"`;
-        const finalQuery = kqlQuery ? `${baseQuery} | ${kqlQuery}` : `${baseQuery} | order by LogTimestamp desc | take 100`;
+        // Updated table name and robust column check
+        const baseQuery = `LyrinEye_Mobile_Log_CL | where column_ifexists('DeviceName', '') == "${deviceId}" or column_ifexists('DeviceName_s', '') == "${deviceId}" or column_ifexists('DeviceId_s', '') == "${deviceId}"`;
+        const finalQuery = kqlQuery ? `${baseQuery} | ${kqlQuery}` : `${baseQuery} | order by TimeGenerated desc | take 100`;
 
         const result = await logsQueryClient.queryWorkspace(
             WORKSPACE_ID,
@@ -222,7 +222,8 @@ export async function getLatestTelemetry(deviceId: string) {
     if (!WORKSPACE_ID) return null;
 
     try {
-        const query = `LyrinEyeTelemetria_CL | where DeviceName =~ "${deviceId}" or DeviceId_s == "${deviceId}" or DeviceId == "${deviceId}" | order by TimeGenerated desc | take 1`;
+        // Robust query on new Telemetry table
+        const query = `LyrinEye_Mobile_Telemetry_CL | where column_ifexists('DeviceName', '') =~ "${deviceId}" or column_ifexists('DeviceId_s', '') == "${deviceId}" or column_ifexists('DeviceId', '') == "${deviceId}" | order by TimeGenerated desc | take 1`;
         const result = await logsQueryClient.queryWorkspace(
             WORKSPACE_ID,
             query,
@@ -246,17 +247,15 @@ export async function getLatestTelemetry(deviceId: string) {
     }
 }
 
-
 const recordingsTableClient = TableClient.fromConnectionString(CONNECTION_STRING, 'camerametadata');
 
 export async function getLogStats(deviceId: string, start: string, end: string, granularity: '1d' | '1h' | '1m') {
     if (!WORKSPACE_ID) return [];
 
     try {
-        // 1. Get logs from Log Analytics (KQL)
-        // Fix: Case-insensitive match =~ and quotes for datetime
-        const query = `logcat_CL 
-            | where DeviceName =~ "${deviceId}"
+        // 1. Get logs from Log Analytics (KQL) - Updated Table Name
+        const query = `LyrinEye_Mobile_Log_CL 
+            | where column_ifexists('DeviceName', '') =~ "${deviceId}" or column_ifexists('DeviceName_s', '') =~ "${deviceId}"
             | where TimeGenerated between (datetime("${start}") .. datetime("${end}"))
             | summarize Count=count() by Timestamp=bin(TimeGenerated, ${granularity})
             | order by Timestamp asc`;

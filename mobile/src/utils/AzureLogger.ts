@@ -48,10 +48,10 @@ class AzureLoggerService {
     }
 
     async telemetry(metrics: Record<string, any>) {
-        await this.log('System Telemetry', metrics, 'INFO', 'LyrinEyeTelemetria');
+        await this.log('System Telemetry', metrics, 'INFO', 'LyrinEye_Mobile_Telemetry');
     }
 
-    async log(message: string, context: Record<string, any> = {}, level: 'INFO' | 'ERROR' | 'WARN' = 'INFO', logType = 'LyrinEyeLogs') {
+    async log(message: string, context: Record<string, any> = {}, level: 'INFO' | 'ERROR' | 'WARN' = 'INFO', logType = 'LyrinEye_Mobile_Log') {
         try {
             const netState = await NetInfo.fetch();
 
