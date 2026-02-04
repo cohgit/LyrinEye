@@ -218,6 +218,38 @@ export async function queryLogs(deviceId: string, kqlQuery?: string, timespan: s
     }
 }
 
+export async function queryWebLogs(kqlQuery?: string, timespan: string = 'PT1H') {
+    if (!WORKSPACE_ID) return [];
+
+    try {
+        const baseQuery = `LyrinEye_Web_Log_CL`;
+        const finalQuery = kqlQuery ? `${baseQuery} | ${kqlQuery}` : `${baseQuery} | order by TimeGenerated desc | take 100`;
+
+        const result = await logsQueryClient.queryWorkspace(
+            WORKSPACE_ID,
+            finalQuery,
+            { duration: timespan as any }
+        );
+
+        if (result.status === 'Success') {
+            return result.tables[0].rows.map(row => {
+                const entry: any = {};
+                result.tables[0].columnDescriptors.forEach((col, idx) => {
+                    const colName = col.name as string;
+                    if (colName) {
+                        entry[colName] = row[idx];
+                    }
+                });
+                return entry;
+            });
+        }
+        return [];
+    } catch (error: any) {
+        console.error('[WEB-LOGS] Error querying web logs:', error.message);
+        return [];
+    }
+}
+
 export async function getLatestTelemetry(deviceId: string) {
     if (!WORKSPACE_ID) return null;
 

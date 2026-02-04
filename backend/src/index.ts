@@ -609,6 +609,21 @@ app.get('/api/devices/:id/stats/logs', async (req, res) => {
     }
 });
 
+// Query Web Logs
+app.get('/api/web/logs', async (req, res) => {
+    try {
+        const { query, timespan } = req.query;
+        const logs = await LogcatService.queryWebLogs(
+            query as string,
+            timespan as string
+        );
+        res.send(logs);
+    } catch (error: any) {
+        console.error(`[WEB-LOGS] Failed to query web logs:`, error);
+        res.status(500).send({ error: error.message });
+    }
+});
+
 // Receive Logcat from Device
 app.post('/api/devices/:id/logcat', async (req, res) => {
     try {
