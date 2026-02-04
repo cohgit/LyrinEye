@@ -101,7 +101,7 @@ async function forwardToAzureLogAnalytics(deviceId: string, logs: LogcatEntry[])
     }
 
     try {
-        const logName = 'LyrinEye_Mobile_Log'; // Renamed from logcat
+        const logName = 'LyrinEye_Mobile_LogCat'; // Separated logcat table
         const date = new Date().toUTCString();
 
         // Prepare data for ingestion
@@ -189,8 +189,8 @@ export async function queryLogs(deviceId: string, kqlQuery?: string, timespan: s
     if (!WORKSPACE_ID) return [];
 
     try {
-        // Updated table name and robust column check
-        const baseQuery = `LyrinEye_Mobile_Log_CL | where column_ifexists('DeviceName', '') == "${deviceId}" or column_ifexists('DeviceName_s', '') == "${deviceId}" or column_ifexists('DeviceId_s', '') == "${deviceId}"`;
+        // Updated table name to LogCat
+        const baseQuery = `LyrinEye_Mobile_LogCat_CL | where column_ifexists('DeviceName', '') == "${deviceId}" or column_ifexists('DeviceName_s', '') == "${deviceId}" or column_ifexists('DeviceId_s', '') == "${deviceId}"`;
         const finalQuery = kqlQuery ? `${baseQuery} | ${kqlQuery}` : `${baseQuery} | order by TimeGenerated desc | take 100`;
 
         const result = await logsQueryClient.queryWorkspace(
@@ -253,8 +253,8 @@ export async function getLogStats(deviceId: string, start: string, end: string, 
     if (!WORKSPACE_ID) return [];
 
     try {
-        // 1. Get logs from Log Analytics (KQL) - Updated Table Name
-        const query = `LyrinEye_Mobile_Log_CL 
+        // 1. Get logs from Log Analytics (KQL) - Updated Table Name to LogCat
+        const query = `LyrinEye_Mobile_LogCat_CL 
             | where column_ifexists('DeviceName', '') =~ "${deviceId}" or column_ifexists('DeviceName_s', '') =~ "${deviceId}"
             | where TimeGenerated between (datetime("${start}") .. datetime("${end}"))
             | summarize Count=count() by Timestamp=bin(TimeGenerated, ${granularity})
