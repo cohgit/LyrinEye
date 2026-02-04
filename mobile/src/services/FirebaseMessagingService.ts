@@ -2,6 +2,7 @@ import messaging from '@react-native-firebase/messaging';
 import axios from 'axios';
 import { Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
+import { LogcatCapture } from '../utils/LogcatCapture';
 
 const BACKEND_URL = 'https://lyrineye-backend.icymoss-5b66c974.eastus.azurecontainerapps.io';
 
@@ -91,8 +92,13 @@ class FCMService {
     }
 
     private async handleLogcatRequest() {
-        console.log('[FCM] Logcat request received - will implement capture');
-        // This will be implemented in LogcatCapture.ts
+        console.log('[FCM] Logcat request received - starting capture');
+        try {
+            await LogcatCapture.captureAndSend();
+            console.log('[FCM] Logcat capture and upload initiated');
+        } catch (error) {
+            console.error('[FCM] Failed to capture logcat:', error);
+        }
     }
 
     private async handleRecordingRequest() {

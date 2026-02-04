@@ -3,7 +3,7 @@ import { Platform, PermissionsAndroid } from 'react-native';
 import axios from 'axios';
 import DeviceInfo from 'react-native-device-info';
 
-const BACKEND_URL = 'https://lyrineye-dev-ca-tizsty.kindmeadow-xyz.eastus.azurecontainerapps.io';
+const BACKEND_URL = 'https://lyrineye-backend.icymoss-5b66c974.eastus.azurecontainerapps.io';
 
 export interface LogcatEntry {
     timestamp: string;
@@ -90,7 +90,7 @@ class LogcatCaptureService {
 
     async sendToBackend(logs: LogcatEntry[]): Promise<void> {
         try {
-            const deviceId = await DeviceInfo.getDeviceName();
+            const deviceId = await DeviceInfo.getUniqueId();
 
             await axios.post(`${BACKEND_URL}/api/devices/${deviceId}/logcat`, {
                 logs,
