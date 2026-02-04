@@ -79,4 +79,9 @@ jobs:
         echo "- **Web Admin Panel**: $(terraform output -raw web_panel_url)" >> $GITHUB_STEP_SUMMARY
         echo "- **Storage Account**: $(terraform output -raw storage_account_name)" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "💰 **Cost Strategy**: Zero-cost (Free tier)" >> $GITHUB_STEP_SUMMARY
+        echo "### 🎥 Mediasoup SFU Server" >> $GITHUB_STEP_SUMMARY
+        echo "- **Public IP**: $(terraform output -raw mediasoup_public_ip)" >> $GITHUB_STEP_SUMMARY
+        echo "- **Domain**: $(terraform output -raw mediasoup_domain)" >> $GITHUB_STEP_SUMMARY
+        echo "- **SSH**: \`$(terraform output -raw mediasoup_ssh_command)\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "💰 **Cost**: ~\$38/month (covered by VS Subscription credit)" >> $GITHUB_STEP_SUMMARY
