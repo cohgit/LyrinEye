@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import LogViewer from './LogViewer'
 import CalendarView from './CalendarView'
-import { Activity, History } from 'lucide-react'
+import RecordingList from './RecordingList'
+import { Activity, History, Video, ArrowLeft } from 'lucide-react'
 
 interface DeviceViewsProps {
     deviceId: string
@@ -11,7 +12,7 @@ interface DeviceViewsProps {
 }
 
 export default function DeviceViews({ deviceId, isLiveEnabled = true }: DeviceViewsProps) {
-    const [view, setView] = useState<'live' | 'history'>(isLiveEnabled ? 'live' : 'history')
+    const [view, setView] = useState<'live' | 'history' | 'recordings'>(isLiveEnabled ? 'live' : 'recordings')
 
     return (
         <div className="space-y-6">
@@ -33,6 +34,19 @@ export default function DeviceViews({ deviceId, isLiveEnabled = true }: DeviceVi
                     </button>
                 )}
                 <button
+                    onClick={() => setView('recordings')}
+                    className={`pb-3 px-2 flex items-center gap-2 text-sm font-medium transition-colors relative ${view === 'recordings'
+                        ? 'text-indigo-400'
+                        : 'text-slate-400 hover:text-slate-300'
+                        }`}
+                >
+                    <Video className="w-4 h-4" />
+                    Grabaciones
+                    {view === 'recordings' && (
+                        <span className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-500 rounded-t-full" />
+                    )}
+                </button>
+                <button
                     onClick={() => setView('history')}
                     className={`pb-3 px-2 flex items-center gap-2 text-sm font-medium transition-colors relative ${view === 'history'
                         ? 'text-indigo-400'
@@ -40,7 +54,7 @@ export default function DeviceViews({ deviceId, isLiveEnabled = true }: DeviceVi
                         }`}
                 >
                     <History className="w-4 h-4" />
-                    Historial
+                    Historial de Logs
                     {view === 'history' && (
                         <span className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-500 rounded-t-full" />
                     )}
@@ -49,11 +63,9 @@ export default function DeviceViews({ deviceId, isLiveEnabled = true }: DeviceVi
 
             {/* Content */}
             <div className="min-h-[500px]">
-                {view === 'live' ? (
-                    <LogViewer deviceId={deviceId} />
-                ) : (
-                    <CalendarView deviceId={deviceId} />
-                )}
+                {view === 'live' && <LogViewer deviceId={deviceId} />}
+                {view === 'recordings' && <RecordingList deviceId={deviceId} />}
+                {view === 'history' && <CalendarView deviceId={deviceId} />}
             </div>
         </div>
     )

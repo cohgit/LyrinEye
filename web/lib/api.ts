@@ -95,3 +95,24 @@ export async function getLogStats(
         return [];
     }
 }
+
+export interface Recording {
+    url: string
+    thumbnailUrl?: string
+    timestamp: string
+    deviceId: string
+    duration?: number
+    size?: number
+}
+
+export async function getRecordings(deviceId: string): Promise<Recording[]> {
+    try {
+        const response = await axios.get(`${getBaseUrl()}/api/recordings`, {
+            params: { roomId: deviceId }
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`Failed to fetch recordings for ${deviceId}:`, error);
+        return [];
+    }
+}
