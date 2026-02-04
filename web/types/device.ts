@@ -9,6 +9,7 @@ export interface Device {
     isCharging: boolean
     isTransmitting: boolean
     isRecording: boolean
+    mode?: string
 }
 
 export interface TelemetryData {
@@ -30,4 +31,8 @@ export interface DeviceDetail extends Device {
     wifiSSID: string
     ipAddress?: string
     streaming?: boolean
+    storageFree?: number // MB
+    ramUsed?: number // MB
+    batteryStatus?: string
+    lowPowerMode?: boolean
 }

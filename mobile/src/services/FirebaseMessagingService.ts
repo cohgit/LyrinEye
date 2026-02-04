@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 
-const BACKEND_URL = 'https://lyrineye-dev-ca-tizsty.kindmeadow-xyz.eastus.azurecontainerapps.io';
+const BACKEND_URL = 'https://lyrineye-backend.icymoss-5b66c974.eastus.azurecontainerapps.io';
 
 class FCMService {
     private deviceId: string = '';

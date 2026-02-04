@@ -72,11 +72,18 @@ export default async function DashboardPage() {
                                 className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-slate-600 transition-all duration-200 hover:scale-[1.02]"
                             >
                                 {/* Status Badge */}
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 className="text-lg font-semibold text-white">{device.name}</h3>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColor}`}>
-                                        {statusLabel}
-                                    </span>
+                                <div>
+                                    <h3 className="text-lg font-semibold text-white">{device.name} <span className="text-slate-500 text-sm font-normal">({device.id})</span></h3>
+                                    <div className="flex gap-2.5 mt-1">
+                                        <span className={`px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
+                                            {statusLabel}
+                                        </span>
+                                        {device.mode && (
+                                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                                Modo: {device.mode.charAt(0).toUpperCase() + device.mode.slice(1)}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Metrics */}

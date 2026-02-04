@@ -62,6 +62,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                         <div>
                             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
                                 {device.name}
+                                <span className="text-slate-500 text-lg font-normal">({device.id})</span>
                                 {(device.isTransmitting || device.streaming) && (
                                     <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-400 text-xs border border-indigo-500/30 animate-pulse">
                                         <Radio className="w-3 h-3" />
@@ -109,12 +110,18 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
 
                                 <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
                                     <h3 className="text-xs text-slate-400 mb-2">RAM</h3>
-                                    <div className="text-2xl font-bold text-white">{device.ram?.toFixed(0)} MB</div>
+                                    <div className="text-lg font-bold text-white">
+                                        {device.ramUsed ? `${(device.ramUsed / 1024).toFixed(1)}GB / ` : ''}
+                                        {(device.ram / 1024).toFixed(1)} GB
+                                    </div>
                                 </div>
 
                                 <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
-                                    <h3 className="text-xs text-slate-400 mb-2">Android</h3>
-                                    <div className="text-2xl font-bold text-white">v{device.androidVersion}</div>
+                                    <h3 className="text-xs text-slate-400 mb-2">Almacenamiento</h3>
+                                    <div className="text-2xl font-bold text-white">
+                                        {device.storageFree ? `${(device.storageFree / 1024).toFixed(1)} GB` : 'N/A'}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500">Libre</div>
                                 </div>
                             </div>
                         ) : (
@@ -134,22 +141,49 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                     {/* Sidebar */}
                     <div className="space-y-6">
                         <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6">
-                            <h3 className="text-lg font-semibold text-white mb-4">Información</h3>
+                            <h3 className="text-lg font-semibold text-white mb-4">Información del Dispositivo</h3>
                             <dl className="space-y-4">
                                 <div>
+                                    <dt className="text-sm text-slate-400">ID del Dispositivo</dt>
+                                    <dd className="text-sm text-white mt-1 break-all font-mono bg-slate-900/50 p-1 rounded">{id}</dd>
+                                </div>
+                                <div>
                                     <dt className="text-sm text-slate-400 flex items-center gap-2">
-                                        <Wifi className="w-4 h-4" /> WiFi
+                                        <Wifi className="w-4 h-4" /> Red WiFi
                                     </dt>
                                     <dd className="text-sm text-white mt-1">{device.wifiSSID || 'No disponible'}</dd>
                                 </div>
-                                {device.ipAddress && (
-                                    <div>
-                                        <dt className="text-sm text-slate-400">IP del Cliente</dt>
-                                        <dd className="text-sm text-white mt-1">{device.ipAddress}</dd>
-                                    </div>
-                                )}
                                 <div>
-                                    <dt className="text-sm text-slate-400">Estado de Red</dt>
+                                    <dt className="text-sm text-slate-400">Dirección IP</dt>
+                                    <dd className="text-sm text-white mt-1 font-mono">{device.ipAddress || 'Desconocida'}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-slate-400">Versión Android</dt>
+                                    <dd className="text-sm text-white mt-1">v{device.androidVersion}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-slate-400">Versión App</dt>
+                                    <dd className="text-sm text-white mt-1">{device.appVersion}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-slate-400">Modo de Operación</dt>
+                                    <dd className="text-sm text-white mt-1">
+                                        {device.mode ? (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 capitalize">
+                                                {device.mode}
+                                            </span>
+                                        ) : 'Desconocido'}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-slate-400">Estado Batería</dt>
+                                    <dd className="text-sm text-white mt-1 capitalize">
+                                        {device.batteryStatus || 'Desconocido'}
+                                        {device.lowPowerMode && <span className="ml-2 text-xs text-yellow-500">(Ahorro activado)</span>}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-slate-400">Estado de Conexión</dt>
                                     <dd className="text-sm text-white mt-1">
                                         {device.telemetry?.ConnectionStart ? (
                                             <span className="text-green-400 flex items-center gap-1">

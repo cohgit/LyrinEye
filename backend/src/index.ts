@@ -478,10 +478,16 @@ app.get('/api/devices/:id', async (req, res) => {
         const battery = getVal(telemetry, 'BatteryLevel');
         const isConn = getVal(telemetry, 'ConnectionStart');
         const isCharging = getVal(telemetry, 'IsCharging');
+        const deviceName = getVal(telemetry, 'DeviceName');
+        const mode = getVal(telemetry, 'Mode');
+        const storageFree = getVal(telemetry, 'StorageFreeMB');
+        const ramUsed = getVal(telemetry, 'RamUsedMB');
+        const batteryStatus = getVal(telemetry, 'BatteryStatus');
+        const lowPowerMode = getVal(telemetry, 'LowPowerMode');
 
         const deviceData = {
             id: deviceId,
-            name: (deviceEntity as any)?.name || deviceId.substring(0, 8),
+            name: deviceName || (deviceEntity as any)?.name || deviceId.substring(0, 8),
             status: 'online',
             lastSeen: isTransmitting || streaming ? new Date().toISOString() : ((deviceEntity as any)?.registeredAt || new Date().toISOString()),
             isTransmitting: isTransmitting || streaming === true || streaming === "true",
@@ -496,6 +502,11 @@ app.get('/api/devices/:id', async (req, res) => {
             ipAddress: ip || null,
             streaming: streaming === true || streaming === "true",
             connectionStart: isConn === true || isConn === "true",
+            mode: mode || 'unknown',
+            storageFree: storageFree ? parseFloat(storageFree) : undefined,
+            ramUsed: ramUsed ? parseFloat(ramUsed) : undefined,
+            batteryStatus: batteryStatus || undefined,
+            lowPowerMode: lowPowerMode === 'Yes' || lowPowerMode === true || lowPowerMode === "true",
             telemetry: telemetry || {}
         };
 
