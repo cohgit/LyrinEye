@@ -1,5 +1,26 @@
 # Mediasoup SFU Server Infrastructure
 
+# Virtual Network for Mediasoup
+resource "azurerm_virtual_network" "mediasoup" {
+  name                = "lyrineye-mediasoup-vnet"
+  address_space       = ["10.0.0.0/16"]
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  
+  tags = {
+    Environment = var.environment
+    Component   = "Mediasoup-SFU"
+  }
+}
+
+# Subnet for Mediasoup VM
+resource "azurerm_subnet" "mediasoup" {
+  name                 = "lyrineye-mediasoup-subnet"
+  resource_group_name  = azurerm_resource_group.main.name
+  virtual_network_name = azurerm_virtual_network.mediasoup.name
+  address_prefixes     = ["10.0.1.0/24"]
+}
+
 # Public IP for Mediasoup server
 resource "azurerm_public_ip" "mediasoup" {
   name                = "lyrineye-mediasoup-ip"
@@ -85,7 +106,7 @@ resource "azurerm_network_interface" "mediasoup" {
 
   ip_configuration {
     name                          = "internal"
-    subnet_id                     = azurerm_subnet.main.id
+    subnet_id                     = azurerm_subnet.mediasoup.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.mediasoup.id
   }
