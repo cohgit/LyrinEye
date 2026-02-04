@@ -136,7 +136,6 @@ async function forwardToAzureLogAnalytics(deviceId: string, logs: LogcatEntry[])
 
         console.log(`[LOGCAT] Successfully forwarded ${logs.length} logs to Log Analytics`);
     } catch (error: any) {
-    } catch (error: any) {
         console.error('[LOGCAT] Error forwarding to Log Analytics:', error.response?.data || error.message);
     }
 }
