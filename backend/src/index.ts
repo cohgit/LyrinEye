@@ -287,7 +287,7 @@ app.post('/share-device', async (req, res) => {
 });
 
 // List Recordings
-app.get('/recordings', async (req, res) => {
+app.get('/api/recordings', async (req, res) => {
     try {
         const roomId = req.query.roomId as string;
         const email = req.query.email as string;
