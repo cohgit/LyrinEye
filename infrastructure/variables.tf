@@ -26,4 +26,9 @@ variable "firebase_service_account_key" {
   type        = string
   description = "JSON content of Firebase Service Account Key"
   sensitive   = true
+
+  validation {
+    condition     = length(var.firebase_service_account_key) > 0
+    error_message = "The firebase_service_account_key variable must not be empty."
+  }
 }
