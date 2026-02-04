@@ -25,3 +25,19 @@ output "web_panel_api_token" {
   description = "API token for GitHub Actions deployment"
   sensitive   = true
 }
+
+# Mediasoup SFU Outputs
+output "mediasoup_public_ip" {
+  description = "Public IP address of Mediasoup server"
+  value       = azurerm_public_ip.mediasoup.ip_address
+}
+
+output "mediasoup_ssh_command" {
+  description = "SSH command to connect to Mediasoup server"
+  value       = "ssh ${var.vm_admin_username}@${azurerm_public_ip.mediasoup.ip_address}"
+}
+
+output "mediasoup_domain" {
+  description = "Mediasoup SFU domain"
+  value       = var.mediasoup_domain
+}
