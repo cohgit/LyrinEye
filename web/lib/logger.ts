@@ -64,10 +64,23 @@ class AzureLogger {
                 const response = await originalFetch.apply(this, args);
 
                 const duration = Date.now() - startTime;
-                _this.capture('info', [`[NETWORK] ${method} ${url} ${response.status} (${duration}ms)`]);
+                let body = '';
+
+                // Only capture body for API calls to avoid noise
+                if (url && url.includes('/api/')) {
+                    try {
+                        const clone = response.clone();
+                        const text = await clone.text();
+                        body = text.length > 2000 ? text.substring(0, 2000) + '...' : text;
+                    } catch (e) {
+                        body = '[Failed to read body]';
+                    }
+                }
+
+                _this.capture('info', [`[NETWORK] ${method} ${url} ${response.status} (${duration}ms) ${body ? `Response: ${body}` : ''}`]);
 
                 if (!response.ok) {
-                    _this.capture('error', [`[NETWORK-ERROR] ${method} ${url} ${response.status} ${response.statusText}`]);
+                    _this.capture('error', [`[NETWORK-ERROR] ${method} ${url} ${response.status} ${response.statusText} Response: ${body}`]);
                 }
 
                 return response;
@@ -111,10 +124,24 @@ class AzureLogger {
                 // @ts-ignore
                 const method = this._method;
 
-                _this.capture('info', [`[NETWORK] ${method} ${url} ${status} (${duration}ms)`]);
+                let body = '';
+                // @ts-ignore
+                if (url && url.includes('/api/')) {
+                    try {
+                        // @ts-ignore
+                        const resp = this.responseText || (this.responseType === 'text' || !this.responseType ? this.response : '[Binary/Object]');
+                        if (typeof resp === 'string') {
+                            body = resp.length > 2000 ? resp.substring(0, 2000) + '...' : resp;
+                        }
+                    } catch (e) {
+                        body = '[Failed to read body]';
+                    }
+                }
+
+                _this.capture('info', [`[NETWORK] ${method} ${url} ${status} (${duration}ms) ${body ? `Response: ${body}` : ''}`]);
 
                 if (status >= 400) {
-                    _this.capture('error', [`[NETWORK-ERROR] ${method} ${url} ${status}`]);
+                    _this.capture('error', [`[NETWORK-ERROR] ${method} ${url} ${status} Response: ${body}`]);
                 }
             });
 
