@@ -31,6 +31,7 @@ class AzureLogger {
 
         this.initialized = true;
         this.overrideConsole();
+        this.interceptNetwork();
 
         // Flush regularly
         setInterval(() => this.flush(), FLUSH_INTERVAL);
@@ -42,6 +43,94 @@ class AzureLogger {
         });
 
         this.info('Azure Logger initialized');
+    }
+
+    private interceptNetwork() {
+        const _this = this;
+
+        // 1. Intercept Fetch
+        const originalFetch = window.fetch;
+        window.fetch = async function (...args) {
+            const url = args[0]?.toString();
+            // Ignore log requests (prevent loop) and polling if noisy
+            if (url && (url.includes(API_URL) || url.includes('socket.io'))) {
+                return originalFetch.apply(this, args);
+            }
+
+            const startTime = Date.now();
+            const method = args[1]?.method || 'GET';
+
+            try {
+                const response = await originalFetch.apply(this, args);
+
+                const duration = Date.now() - startTime;
+                _this.capture('info', [`[NETWORK] ${method} ${url} ${response.status} (${duration}ms)`]);
+
+                if (!response.ok) {
+                    _this.capture('error', [`[NETWORK-ERROR] ${method} ${url} ${response.status} ${response.statusText}`]);
+                }
+
+                return response;
+            } catch (error: any) {
+                const duration = Date.now() - startTime;
+                _this.capture('error', [`[NETWORK-FAIL] ${method} ${url} (${duration}ms) - ${error.message}`]);
+                throw error;
+            }
+        };
+
+        // 2. Intercept XMLHttpRequest (Axios uses this)
+        const originalOpen = XMLHttpRequest.prototype.open;
+        const originalSend = XMLHttpRequest.prototype.send;
+
+        XMLHttpRequest.prototype.open = function (method: string, url: string | URL, ...rest: any[]) {
+            // @ts-ignore
+            this._url = url.toString();
+            // @ts-ignore
+            this._method = method;
+            // @ts-ignore
+            this._startTime = Date.now();
+
+            // @ts-ignore
+            return originalOpen.apply(this, [method, url, ...rest]);
+        };
+
+        XMLHttpRequest.prototype.send = function (...args: any[]) {
+            // @ts-ignore
+            if (this._url && (this._url.includes(API_URL) || this._url.includes('socket.io'))) {
+                // @ts-ignore
+                return originalSend.apply(this, args as [Document | XMLHttpRequestBodyInit | null | undefined]);
+            }
+
+            this.addEventListener('load', function () {
+                // @ts-ignore
+                const duration = Date.now() - this._startTime;
+                // @ts-ignore
+                const status = this.status;
+                // @ts-ignore
+                const url = this._url;
+                // @ts-ignore
+                const method = this._method;
+
+                _this.capture('info', [`[NETWORK] ${method} ${url} ${status} (${duration}ms)`]);
+
+                if (status >= 400) {
+                    _this.capture('error', [`[NETWORK-ERROR] ${method} ${url} ${status}`]);
+                }
+            });
+
+            this.addEventListener('error', function () {
+                // @ts-ignore
+                const duration = Date.now() - this._startTime;
+                // @ts-ignore
+                const url = this._url;
+                // @ts-ignore
+                const method = this._method;
+                _this.capture('error', [`[NETWORK-FAIL] ${method} ${url} (${duration}ms)`]);
+            });
+
+            // @ts-ignore
+            return originalSend.apply(this, args as [Document | XMLHttpRequestBodyInit | null | undefined]);
+        };
     }
 
     private overrideConsole() {
