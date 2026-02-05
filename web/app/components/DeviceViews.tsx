@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import LogViewer from './LogViewer'
+import LiveViewer from './LiveViewer'
 import CalendarView from './CalendarView'
 import { Activity, History } from 'lucide-react'
 
@@ -49,7 +50,12 @@ export default function DeviceViews({ deviceId, isLiveEnabled = true }: DeviceVi
 
             {/* Content */}
             <div className="min-h-[500px]">
-                {view === 'live' && <LogViewer deviceId={deviceId} />}
+                {view === 'live' && (
+                    <div className="space-y-6">
+                        <LiveViewer deviceId={deviceId} />
+                        <LogViewer deviceId={deviceId} />
+                    </div>
+                )}
                 {view === 'history' && <CalendarView deviceId={deviceId} />}
             </div>
         </div>

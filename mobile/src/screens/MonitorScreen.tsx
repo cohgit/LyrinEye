@@ -11,6 +11,7 @@ import { authService } from '../utils/AuthService';
 import { Telemetry } from '../utils/TelemetryService';
 import KeepAwake from 'react-native-keep-awake';
 import ScreenBrightness from 'react-native-screen-brightness';
+import { mediasoupClient } from '../utils/MediasoupClient';
 import NetInfo from '@react-native-community/netinfo';
 
 const RECORDING_DURATION_MS = 60000; // 1 minute per chunk
@@ -33,8 +34,8 @@ const MonitorScreen = ({ navigation }: any) => {
     const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // WebRTC Refs
+    // Mediasoup does not use peerConnections map in the component
     const socketRef = useRef<Socket | null>(null);
-    const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
     const localStream = useRef<any>(null);
 
     // VisionCamera Refs
@@ -212,35 +213,21 @@ const MonitorScreen = ({ navigation }: any) => {
             pendingViewers.current.push(viewerId);
         });
 
-        // Use uniqueId as roomId
+        // Use uniqueId as roomId for signaling presence
         DeviceInfo.getUniqueId().then(id => {
             socketRef.current?.emit('join-room', id, 'monitor');
-        });
-
-        socketRef.current?.on('answer', async ({ from, answer }: any) => {
-            const pc = peerConnections.current.get(from);
-            if (pc) {
-                await pc.setRemoteDescription(new RTCSessionDescription(answer));
-            }
-        });
-
-        socketRef.current?.on('ice-candidate', async ({ from, candidate }: any) => {
-            const pc = peerConnections.current.get(from);
-            if (pc) {
-                await pc.addIceCandidate(new RTCIceCandidate(candidate));
-            }
         });
 
         socketRef.current?.on('monitor-offline', () => { /* no-op */ });
     };
 
-    const pendingViewers = useRef<string[]>([]);
-
-    // --- STREAMING LOGIC (WebRTC) ---
+    // --- STREAMING LOGIC (Mediasoup SFU) ---
 
     const startWebRTC = async () => {
         try {
-            AzureLogger.log('Starting WebRTC Stream');
+            AzureLogger.log('Starting Mediasoup Stream');
+
+            // 1. Get User Media
             const stream = await mediaDevices.getUserMedia({
                 audio: true,
                 video: { width: 640, height: 480, frameRate: 30, facingMode: 'environment' }
@@ -248,48 +235,51 @@ const MonitorScreen = ({ navigation }: any) => {
             localStream.current = stream;
             setLocalStreamUrl(stream.toURL());
 
-            // Process any pending viewers who triggered this mode switch
-            while (pendingViewers.current.length > 0) {
-                const viewerId = pendingViewers.current.shift()!;
-                await initiateConnection(viewerId, stream);
+            // 2. Connect to SFU using Unique Device ID as Room ID
+            const deviceId = await DeviceInfo.getUniqueId();
+            await mediasoupClient.connect(deviceId);
+
+            // 3. Produce (Publish) Tracks
+            const tracks = stream.getTracks();
+            for (const track of tracks) {
+                await mediasoupClient.produce(track);
             }
+
+            // 4. Start Server-Side Recording
+            try {
+                await mediasoupClient.startServerRecording();
+                AzureLogger.log('Server-side Recording Started');
+            } catch (err) {
+                console.warn('Failed to start server recording:', err);
+            }
+
+            setMode('streaming');
         } catch (e) {
-            AzureLogger.log('WebRTC Start Failed', { error: String(e) }, 'ERROR');
-            setMode('idle'); // Fallback
+            AzureLogger.log('Mediasoup Start Failed', { error: String(e) }, 'ERROR');
+            Alert.alert('Error', 'No se pudo iniciar la transmisión.');
+            setMode('idle');
+            stopWebRTC();
         }
     };
 
-    const stopWebRTC = () => {
+    const stopWebRTC = async () => {
+        try {
+            // Stop Server Recording
+            await mediasoupClient.stopServerRecording();
+        } catch (e) {
+            console.warn('Error stopping server recording', e);
+        }
+
+        // Disconnect Mediasoup
+        mediasoupClient.disconnect();
+
+        // Stop Local Stream
         if (localStream.current) {
             localStream.current.getTracks().forEach((t: any) => t.stop());
             localStream.current = null;
         }
         setLocalStreamUrl(null);
-        peerConnections.current.forEach(pc => pc.close());
-        peerConnections.current.clear();
         isRecordingRef.current = false;
-    };
-
-    const initiateConnection = async (viewerId: string, stream: any) => {
-        AzureLogger.log('Connecting to Viewer', { viewerId });
-        const pc = new RTCPeerConnection(configuration);
-        peerConnections.current.set(viewerId, pc);
-
-        stream.getTracks().forEach((track: any) => pc.addTrack(track, stream));
-
-        (pc as any).onicecandidate = (event: any) => {
-            if (event.candidate) {
-                DeviceInfo.getUniqueId().then(id => {
-                    socketRef.current?.emit('ice-candidate', { roomId: id, candidate: event.candidate, to: viewerId });
-                });
-            }
-        };
-
-        const offer = await pc.createOffer({});
-        await pc.setLocalDescription(offer);
-        const deviceId = await DeviceInfo.getUniqueId();
-        socketRef.current?.emit('offer', { roomId: deviceId, offer, to: viewerId });
-        AzureLogger.log('Offer Sent', { mode: 'monitor', viewerId });
     };
 
     // --- RECORDING LOGIC (VisionCamera) ---
