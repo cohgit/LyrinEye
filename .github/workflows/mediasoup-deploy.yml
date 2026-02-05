@@ -44,6 +44,14 @@ jobs:
     - name: Build TypeScript
       run: npm run build
 
+    - name: Create deployment package
+      run: |
+        tar -czf ../mediasoup-server.tar.gz \
+          dist/ \
+          package.json \
+          package-lock.json \
+          .env.example
+
     - name: Upload to server
       run: |
         scp -i ~/.ssh/mediasoup_key \
