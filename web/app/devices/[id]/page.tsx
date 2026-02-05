@@ -135,7 +135,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                         )}
 
                         {/* Views (Live / History) */}
-                        <DeviceViews deviceId={id} isLiveEnabled={showMetrics} />
+                        <DeviceViews deviceId={id} isLiveEnabled={showMetrics} userEmail={session?.user?.email || undefined} />
                     </div>
 
                     {/* Sidebar */}

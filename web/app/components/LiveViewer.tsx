@@ -4,13 +4,14 @@ import { MediasoupViewer } from '@/lib/MediasoupViewer';
 
 interface Props {
     deviceId: string;
+    userEmail?: string;
 }
 
 import { io, Socket } from 'socket.io-client';
 
 const LEGACY_SIGNALING_URL = 'https://lyrineye-backend.icymoss-5b66c974.eastus.azurecontainerapps.io';
 
-export default function LiveViewer({ deviceId }: Props) {
+export default function LiveViewer({ deviceId, userEmail }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [status, setStatus] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
     const viewerRef = useRef<MediasoupViewer | null>(null);
@@ -23,7 +24,7 @@ export default function LiveViewer({ deviceId }: Props) {
             console.log('📡 Sending Wake-Up signal (Legacy Socket)...');
             const legacySocket = io(LEGACY_SIGNALING_URL);
             legacySocketRef.current = legacySocket;
-            legacySocket.emit('join-room', deviceId, 'viewer');
+            legacySocket.emit('join-room', deviceId, 'viewer', userEmail || 'guest@lyrineye.app');
 
             // 2. Connect Mediasoup
             const viewer = new MediasoupViewer((track: MediaStreamTrack) => {

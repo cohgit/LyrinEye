@@ -9,9 +9,10 @@ import { Activity, History } from 'lucide-react'
 interface DeviceViewsProps {
     deviceId: string
     isLiveEnabled?: boolean
+    userEmail?: string
 }
 
-export default function DeviceViews({ deviceId, isLiveEnabled = true }: DeviceViewsProps) {
+export default function DeviceViews({ deviceId, isLiveEnabled = true, userEmail }: DeviceViewsProps) {
     const [view, setView] = useState<'live' | 'history'>(isLiveEnabled ? 'live' : 'history')
 
     return (
@@ -52,7 +53,7 @@ export default function DeviceViews({ deviceId, isLiveEnabled = true }: DeviceVi
             <div className="min-h-[500px]">
                 {view === 'live' && (
                     <div className="space-y-6">
-                        <LiveViewer deviceId={deviceId} />
+                        <LiveViewer deviceId={deviceId} userEmail={userEmail} />
                         <LogViewer deviceId={deviceId} />
                     </div>
                 )}
