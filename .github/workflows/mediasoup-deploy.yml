@@ -1,0 +1,143 @@
+name: 'Mediasoup Server Deploy'
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'mediasoup-server/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: 'Deploy to Azure VM'
+    runs-on: ubuntu-latest
+    environment: production
+
+    defaults:
+      run:
+        working-directory: ./mediasoup-server
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: mediasoup-server/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build TypeScript
+      run: npm run build
+
+    - name: Create deployment package
+      run: |
+        tar -czf ../mediasoup-server.tar.gz \
+          dist/ \
+          package.json \
+          package-lock.json \
+          .env.example
+
+    - name: Setup SSH key
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.MEDIASOUP_SSH_PRIVATE_KEY }}" > ~/.ssh/mediasoup_key
+        chmod 600 ~/.ssh/mediasoup_key
+        ssh-keyscan -H ${{ secrets.MEDIASOUP_SERVER_IP }} >> ~/.ssh/known_hosts
+
+    - name: Upload to server
+      run: |
+        scp -i ~/.ssh/mediasoup_key \
+          ../mediasoup-server.tar.gz \
+          azureuser@${{ secrets.MEDIASOUP_SERVER_IP }}:/tmp/
+
+    - name: Deploy on server
+      run: |
+        ssh -i ~/.ssh/mediasoup_key azureuser@${{ secrets.MEDIASOUP_SERVER_IP }} << 'EOF'
+          set -e
+          
+          # Stop service
+          sudo systemctl stop mediasoup || true
+          
+          # Backup current version
+          if [ -d /opt/mediasoup-server ]; then
+            sudo cp -r /opt/mediasoup-server /opt/mediasoup-server.backup.$(date +%Y%m%d_%H%M%S)
+          fi
+          
+          # Extract new version
+          sudo mkdir -p /opt/mediasoup-server
+          sudo tar -xzf /tmp/mediasoup-server.tar.gz -C /opt/mediasoup-server
+          
+          # Install production dependencies
+          cd /opt/mediasoup-server
+          sudo npm ci --only=production
+          
+          # Set ownership
+          sudo chown -R mediasoup:mediasoup /opt/mediasoup-server
+          
+          # Setup environment if not exists
+          if [ ! -f /opt/mediasoup-server/.env ]; then
+            sudo cp /opt/mediasoup-server/.env.example /opt/mediasoup-server/.env
+            sudo chown mediasoup:mediasoup /opt/mediasoup-server/.env
+            
+            # Configure with secrets
+            sudo sed -i "s|ANNOUNCED_IP=.*|ANNOUNCED_IP=${{ secrets.MEDIASOUP_SERVER_IP }}|" /opt/mediasoup-server/.env
+            sudo sed -i "s|AZURE_STORAGE_CONNECTION_STRING=.*|AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}|" /opt/mediasoup-server/.env
+            sudo sed -i "s|BACKEND_URL=.*|BACKEND_URL=${{ secrets.BACKEND_URL }}|" /opt/mediasoup-server/.env
+          fi
+          
+          # Start service
+          sudo systemctl enable mediasoup
+          sudo systemctl start mediasoup
+          
+          # Wait for startup
+          sleep 3
+          
+          # Check status
+          sudo systemctl status mediasoup --no-pager
+          
+          # Cleanup
+          rm /tmp/mediasoup-server.tar.gz
+          
+          # Keep only last 3 backups
+          cd /opt
+          ls -t mediasoup-server.backup.* 2>/dev/null | tail -n +4 | xargs -r sudo rm -rf
+        EOF
+
+    - name: Verify deployment
+      run: |
+        sleep 5
+        curl -f https://${{ secrets.MEDIASOUP_DOMAIN }}/health || exit 1
+
+    - name: Deployment Summary
+      if: success()
+      run: |
+        echo "## 🎥 Mediasoup Server Deployed!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Server Details" >> $GITHUB_STEP_SUMMARY
+        echo "- **Domain**: https://${{ secrets.MEDIASOUP_DOMAIN }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Health Check**: https://${{ secrets.MEDIASOUP_DOMAIN }}/health" >> $GITHUB_STEP_SUMMARY
+        echo "- **Server IP**: ${{ secrets.MEDIASOUP_SERVER_IP }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Status**: Running" >> $GITHUB_STEP_SUMMARY
+
+    - name: Rollback on failure
+      if: failure()
+      run: |
+        ssh -i ~/.ssh/mediasoup_key azureuser@${{ secrets.MEDIASOUP_SERVER_IP }} << 'EOF'
+          LATEST_BACKUP=$(ls -t /opt/mediasoup-server.backup.* 2>/dev/null | head -n 1)
+          if [ -n "$LATEST_BACKUP" ]; then
+            echo "Rolling back to $LATEST_BACKUP"
+            sudo systemctl stop mediasoup
+            sudo rm -rf /opt/mediasoup-server
+            sudo mv $LATEST_BACKUP /opt/mediasoup-server
+            sudo systemctl start mediasoup
+          fi
+        EOF
