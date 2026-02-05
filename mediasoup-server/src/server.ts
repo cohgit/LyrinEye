@@ -6,6 +6,7 @@ import { config } from './config';
 import { MediasoupManager } from './mediasoup-manager';
 import { RoomManager } from './room-manager';
 import { Recorder } from './recorder';
+import { logger } from './azure-logger';
 import { DtlsParameters, RtpCapabilities, RtpParameters } from 'mediasoup/node/lib/types';
 
 const app = express();
@@ -39,11 +40,13 @@ app.get('/health', (req, res) => {
 // Socket.IO connection handling
 io.on('connection', (socket) => {
     console.log(`🔌 Client connected: ${socket.id}`);
+    logger.log('client-connected', { socketId: socket.id });
 
     // Join room
     socket.on('join-room', async ({ roomId, role }, callback) => {
         try {
             console.log(`📥 join-room: ${roomId}, role: ${role}`);
+            logger.log('join-room', { roomId, socketId: socket.id, data: { role } });
 
             let room = roomManager.getRoom(roomId);
 
@@ -126,6 +129,7 @@ io.on('connection', (socket) => {
     socket.on('produce', async ({ roomId, transportId, kind, rtpParameters }, callback) => {
         try {
             console.log(`📥 produce: ${roomId}, kind: ${kind}`);
+            logger.log('produce-request', { roomId, transportId, socketId: socket.id, data: { kind } });
 
             const transport = roomManager.getTransport(roomId, transportId);
             if (!transport) {
@@ -139,7 +143,17 @@ io.on('connection', (socket) => {
 
             roomManager.addProducer(roomId, producer);
 
+            logger.log('producer-created', { roomId, producerId: producer.id, socketId: socket.id, data: { kind } });
+
             // Notify all viewers in the room
+            const viewersInRoom = Array.from(io.sockets.adapter.rooms.get(roomId) || []).filter(id => id !== socket.id);
+            logger.log('emitting-new-producer', {
+                roomId,
+                producerId: producer.id,
+                socketId: socket.id,
+                data: { kind, viewerCount: viewersInRoom.length, viewers: viewersInRoom }
+            });
+
             socket.to(roomId).emit('new-producer', {
                 producerId: producer.id,
                 kind: producer.kind,
@@ -159,6 +173,7 @@ io.on('connection', (socket) => {
     socket.on('consume', async ({ roomId, transportId, producerId, rtpCapabilities }, callback) => {
         try {
             console.log(`📥 consume: ${roomId}, producer: ${producerId}`);
+            logger.log('consume-request', { roomId, transportId, producerId, socketId: socket.id });
 
             const room = roomManager.getRoom(roomId);
             const transport = roomManager.getTransport(roomId, transportId);
@@ -169,6 +184,7 @@ io.on('connection', (socket) => {
 
             // Check if we can consume
             if (!room.router.canConsume({ producerId, rtpCapabilities })) {
+                logger.log('consume-cannot-consume', { roomId, producerId, socketId: socket.id, level: 'WARN' });
                 throw new Error('Cannot consume');
             }
 
@@ -179,6 +195,7 @@ io.on('connection', (socket) => {
             });
 
             roomManager.addConsumer(roomId, consumer.id, consumer);
+            logger.log('consumer-created', { roomId, consumerId: consumer.id, producerId, socketId: socket.id, data: { kind: consumer.kind } });
 
             callback({
                 success: true,
