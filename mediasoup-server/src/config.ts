@@ -1,5 +1,5 @@
 import * as mediasoup from 'mediasoup';
-import { RtpCodecCapability } from 'mediasoup/node/lib/RtpParameters';
+import { RtpCodecCapability } from 'mediasoup/node/lib/types';
 
 export const config = {
     // HTTP server
