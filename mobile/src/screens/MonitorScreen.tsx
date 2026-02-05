@@ -203,22 +203,52 @@ const MonitorScreen = ({ navigation }: any) => {
     }, [mode]);
 
     const setupSocket = () => {
-        if (socketRef.current) return;
+        if (socketRef.current) {
+            AzureLogger.log('Legacy Socket Setup', { status: 'already_exists' }, 'WARN');
+            return;
+        }
 
+        AzureLogger.log('Legacy Socket Setup', { status: 'initializing', server: CONFIG.SIGNALING_SERVER });
         socketRef.current = io(CONFIG.SIGNALING_SERVER);
 
+        // Connection events
+        socketRef.current?.on('connect', () => {
+            AzureLogger.log('Legacy Socket Connected', { socketId: socketRef.current?.id });
+        });
+
+        socketRef.current?.on('disconnect', (reason) => {
+            AzureLogger.log('Legacy Socket Disconnected', { reason, socketId: socketRef.current?.id }, 'WARN');
+        });
+
+        socketRef.current?.on('reconnect', (attemptNumber) => {
+            AzureLogger.log('Legacy Socket Reconnected', { attemptNumber });
+        });
+
+        socketRef.current?.on('connect_error', (error) => {
+            AzureLogger.log('Legacy Socket Connect Error', { error: error.message }, 'ERROR');
+        });
+
+        // Viewer joined event
         socketRef.current?.on('viewer-joined', async (viewerId: string) => {
-            AzureLogger.log('Viewer Joined - Switching to Stream', { viewerId });
+            AzureLogger.log('Viewer Joined - Switching to Stream', {
+                viewerId,
+                currentMode: mode,
+                socketConnected: socketRef.current?.connected,
+                socketId: socketRef.current?.id
+            });
             setMode('streaming');
             pendingViewers.current.push(viewerId);
         });
 
         // Use uniqueId as roomId for signaling presence
         DeviceInfo.getUniqueId().then(id => {
+            AzureLogger.log('Legacy Socket Joining Room', { roomId: id, role: 'monitor' });
             socketRef.current?.emit('join-room', id, 'monitor');
         });
 
-        socketRef.current?.on('monitor-offline', () => { /* no-op */ });
+        socketRef.current?.on('monitor-offline', () => {
+            AzureLogger.log('Legacy Socket Monitor Offline Event');
+        });
     };
 
     // --- STREAMING LOGIC (Mediasoup SFU) ---
