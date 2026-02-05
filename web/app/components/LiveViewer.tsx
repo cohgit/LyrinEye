@@ -6,8 +6,9 @@ interface Props {
     deviceId: string;
 }
 
-const LEGACY_SIGNALING_URL = 'https://lyrineye-backend.icymoss-5b66c974.eastus.azurecontainerapps.io';
 import { io, Socket } from 'socket.io-client';
+
+const LEGACY_SIGNALING_URL = 'https://lyrineye-backend.icymoss-5b66c974.eastus.azurecontainerapps.io';
 
 export default function LiveViewer({ deviceId }: Props) {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -25,7 +26,7 @@ export default function LiveViewer({ deviceId }: Props) {
             legacySocket.emit('join-room', deviceId, 'viewer');
 
             // 2. Connect Mediasoup
-            const viewer = new MediasoupViewer((track) => {
+            const viewer = new MediasoupViewer((track: MediaStreamTrack) => {
                 if (videoRef.current) {
                     console.log('Got track:', track.kind);
                     // Create a new stream or add to existing?

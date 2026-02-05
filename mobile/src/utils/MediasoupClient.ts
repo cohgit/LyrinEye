@@ -1,5 +1,4 @@
-import { Device } from 'mediasoup-client';
-import { Transport, Producer, RtpCapabilities, RtpParameters } from 'mediasoup-client/lib/types';
+import { Device, types } from 'mediasoup-client';
 import { io, Socket } from 'socket.io-client';
 import { CONFIG } from '../config';
 import { AzureLogger } from './AzureLogger';
@@ -14,8 +13,8 @@ registerGlobals();
 export class MediasoupClient {
     private socket: Socket | null = null;
     private device: Device | null = null;
-    private sendTransport: Transport | null = null;
-    private producers: Map<string, Producer> = new Map();
+    private sendTransport: types.Transport | null = null;
+    private producers: Map<string, types.Producer> = new Map();
     private roomId: string | null = null;
 
     constructor() {

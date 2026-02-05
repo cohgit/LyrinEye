@@ -1,13 +1,12 @@
-import { Device } from 'mediasoup-client';
-import { Transport, Consumer } from 'mediasoup-client/lib/types';
+import { Device, types } from 'mediasoup-client';
 import { io, Socket } from 'socket.io-client';
 import { MEDIASOUP_CONFIG } from './MediasoupConfig';
 
 export class MediasoupViewer {
     private socket: Socket | null = null;
     private device: Device | null = null;
-    private recvTransport: Transport | null = null;
-    private consumer: Consumer | null = null;
+    private recvTransport: types.Transport | null = null;
+    private consumer: types.Consumer | null = null;
     private roomId: string | null = null;
     private onTrack: (track: MediaStreamTrack) => void;
 
