@@ -5,6 +5,7 @@ import cors from 'cors';
 import { config } from './config';
 import { MediasoupManager } from './mediasoup-manager';
 import { RoomManager } from './room-manager';
+import { Recorder } from './recorder';
 import { DtlsParameters, RtpCapabilities, RtpParameters } from 'mediasoup/node/lib/types';
 
 const app = express();
