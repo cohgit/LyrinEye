@@ -67,5 +67,5 @@ variable "ssh_public_key" {
 variable "mediasoup_domain" {
   type        = string
   description = "Domain name for Mediasoup SFU (e.g., sfu.lyrineye.com)"
-  default     = "sfu.lyrineye.com"
+  default     = "lyrineye-stream.eastus.cloudapp.azure.com"
 }
