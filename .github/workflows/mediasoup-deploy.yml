@@ -82,16 +82,16 @@ jobs:
           # Set ownership
           sudo chown -R mediasoup:mediasoup /opt/mediasoup-server
           
-          # Setup environment if not exists
-          if [ ! -f /opt/mediasoup-server/.env ]; then
-            sudo cp /opt/mediasoup-server/.env.example /opt/mediasoup-server/.env
-            sudo chown mediasoup:mediasoup /opt/mediasoup-server/.env
-            
-            # Configure with secrets
-            sudo sed -i "s|ANNOUNCED_IP=.*|ANNOUNCED_IP=${{ secrets.MEDIASOUP_SERVER_IP }}|" /opt/mediasoup-server/.env
-            sudo sed -i "s|AZURE_STORAGE_CONNECTION_STRING=.*|AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}|" /opt/mediasoup-server/.env
-            sudo sed -i "s|BACKEND_URL=.*|BACKEND_URL=${{ secrets.BACKEND_URL }}|" /opt/mediasoup-server/.env
-          fi
+          # Always update .env with latest configuration
+          sudo cp /opt/mediasoup-server/.env.example /opt/mediasoup-server/.env
+          sudo chown mediasoup:mediasoup /opt/mediasoup-server/.env
+          
+          # Configure with all secrets (always update)
+          sudo sed -i "s|ANNOUNCED_IP=.*|ANNOUNCED_IP=${{ secrets.MEDIASOUP_SERVER_IP }}|" /opt/mediasoup-server/.env
+          sudo sed -i "s|AZURE_STORAGE_CONNECTION_STRING=.*|AZURE_STORAGE_CONNECTION_STRING=${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}|" /opt/mediasoup-server/.env
+          sudo sed -i "s|AZURE_LOG_WORKSPACE_ID=.*|AZURE_LOG_WORKSPACE_ID=${{ secrets.AZURE_LOG_WORKSPACE_ID }}|" /opt/mediasoup-server/.env
+          sudo sed -i "s|AZURE_LOG_WORKSPACE_KEY=.*|AZURE_LOG_WORKSPACE_KEY=${{ secrets.AZURE_LOG_WORKSPACE_KEY }}|" /opt/mediasoup-server/.env
+          sudo sed -i "s|BACKEND_URL=.*|BACKEND_URL=${{ secrets.BACKEND_URL }}|" /opt/mediasoup-server/.env
           
           # Start service
           sudo systemctl enable mediasoup
