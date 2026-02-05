@@ -114,14 +114,25 @@ io.on('connection', (socket) => {
 
             const transport = roomManager.getTransport(roomId, transportId);
             if (!transport) {
-                throw new Error('Transport not found');
+                const error = 'Transport not found';
+                console.error(`❌ ${error}`);
+                if (callback && typeof callback === 'function') {
+                    callback({ success: false, error });
+                }
+                return;
             }
 
             await transport.connect({ dtlsParameters });
-            callback({ success: true });
+            console.log(`✓ Transport connected: ${transportId}`);
+
+            if (callback && typeof callback === 'function') {
+                callback({ success: true });
+            }
         } catch (error: any) {
             console.error('❌ connect-transport error:', error);
-            callback({ success: false, error: error.message });
+            if (callback && typeof callback === 'function') {
+                callback({ success: false, error: error.message });
+            }
         }
     });
 
