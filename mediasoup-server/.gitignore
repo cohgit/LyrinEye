@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+.env
+*.mp4
+*.webm
+recordings/
