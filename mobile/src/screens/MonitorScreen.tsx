@@ -228,34 +228,52 @@ const MonitorScreen = ({ navigation }: any) => {
             AzureLogger.log('Starting Mediasoup Stream');
 
             // 1. Get User Media
+            AzureLogger.log('WebRTC Step', { step: 1, action: 'Getting user media' });
             const stream = await mediaDevices.getUserMedia({
                 audio: true,
                 video: { width: 640, height: 480, frameRate: 30, facingMode: 'environment' }
             });
             localStream.current = stream;
             setLocalStreamUrl(stream.toURL());
+            AzureLogger.log('WebRTC Step', { step: 1, action: 'Got user media', tracks: stream.getTracks().length });
 
             // 2. Connect to SFU using Unique Device ID as Room ID
             const deviceId = await DeviceInfo.getUniqueId();
+            AzureLogger.log('WebRTC Step', { step: 2, action: 'Connecting to Mediasoup', deviceId });
             await mediasoupClient.connect(deviceId);
+            AzureLogger.log('WebRTC Step', { step: 2, action: 'Connected to Mediasoup' });
 
             // 3. Produce (Publish) Tracks
             const tracks = stream.getTracks();
-            for (const track of tracks) {
+            AzureLogger.log('WebRTC Step', { step: 3, action: 'Starting produce loop', trackCount: tracks.length });
+
+            for (let i = 0; i < tracks.length; i++) {
+                const track = tracks[i];
+                AzureLogger.log('WebRTC Step', { step: 3, action: 'Producing track', index: i, kind: track.kind });
                 await mediasoupClient.produce(track);
+                AzureLogger.log('WebRTC Step', { step: 3, action: 'Track produced', index: i, kind: track.kind });
             }
 
+            AzureLogger.log('WebRTC Step', { step: 3, action: 'All tracks produced successfully' });
+
             // 4. Start Server-Side Recording
+            AzureLogger.log('WebRTC Step', { step: 4, action: 'Starting server recording' });
             try {
                 await mediasoupClient.startServerRecording();
                 AzureLogger.log('Server-side Recording Started');
             } catch (err) {
                 console.warn('Failed to start server recording:', err);
+                AzureLogger.log('Server Recording Failed', { error: String(err) }, 'WARN');
             }
 
             setMode('streaming');
-        } catch (e) {
-            AzureLogger.log('Mediasoup Start Failed', { error: String(e) }, 'ERROR');
+            AzureLogger.log('WebRTC Started Successfully');
+        } catch (e: any) {
+            AzureLogger.log('Mediasoup Start Failed', {
+                error: String(e),
+                message: e?.message,
+                name: e?.name
+            }, 'ERROR');
             Alert.alert('Error', 'No se pudo iniciar la transmisión.');
             setMode('idle');
             stopWebRTC();

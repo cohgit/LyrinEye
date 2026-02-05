@@ -130,24 +130,47 @@ export class MediasoupClient {
 
     // 4. Produce Media (Audio/Video)
     async produce(track: MediaStreamTrack) {
-        if (!this.sendTransport) throw new Error('Transport not ready');
+        if (!this.sendTransport) {
+            const error = 'Transport not ready';
+            AzureLogger.log('Mediasoup Produce Failed', { error, reason: 'sendTransport is null' }, 'ERROR');
+            throw new Error(error);
+        }
 
         try {
+            AzureLogger.log('Mediasoup Produce Attempt', {
+                kind: track.kind,
+                readyState: track.readyState,
+                transportState: this.sendTransport.connectionState,
+                trackEnabled: track.enabled
+            });
+
             const producer = await this.sendTransport.produce({ track });
             this.producers.set(track.kind, producer);
 
-            AzureLogger.log('Mediasoup Producing', { kind: track.kind, id: producer.id });
+            AzureLogger.log('Mediasoup Producing', {
+                kind: track.kind,
+                id: producer.id,
+                paused: producer.paused,
+                rtpParameters: producer.rtpParameters ? 'present' : 'missing'
+            });
 
             producer.on('transportclose', () => {
+                AzureLogger.log('Producer Transport Closed', { kind: track.kind, id: producer.id }, 'WARN');
                 this.producers.delete(track.kind);
             });
 
-            producer.on('close', () => {
-                this.producers.delete(track.kind);
-            });
-
-        } catch (error) {
+        } catch (error: any) {
+            const errorDetails = {
+                message: error?.message || String(error),
+                name: error?.name,
+                stack: error?.stack,
+                kind: track.kind,
+                trackReadyState: track.readyState,
+                transportState: this.sendTransport?.connectionState,
+                sendTransportId: this.sendTransport?.id
+            };
             console.error('Produce error:', error);
+            AzureLogger.log('Mediasoup Produce Failed', errorDetails, 'ERROR');
             throw error;
         }
     }
