@@ -211,6 +211,58 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Start recording
+    socket.on('start-recording', async ({ roomId }, callback) => {
+        try {
+            console.log(`📥 start-recording: ${roomId}`);
+
+            const room = roomManager.getRoom(roomId);
+            if (!room || !room.producer) {
+                throw new Error('Room or producer not found');
+            }
+
+            if (room.recorder) {
+                throw new Error('Recording already in progress');
+            }
+
+            // Initialize recorder
+            const recorder = new Recorder(
+                room.router,
+                roomId,
+                room.producer.id,
+                room.producer.kind === 'audio'
+            );
+
+            await recorder.start();
+            room.recorder = recorder;
+
+            callback({ success: true });
+        } catch (error: any) {
+            console.error('❌ start-recording error:', error);
+            callback({ success: false, error: error.message });
+        }
+    });
+
+    // Stop recording
+    socket.on('stop-recording', async ({ roomId }, callback) => {
+        try {
+            console.log(`📥 stop-recording: ${roomId}`);
+
+            const room = roomManager.getRoom(roomId);
+            if (!room || !room.recorder) {
+                throw new Error('Recording not found');
+            }
+
+            await room.recorder.stop();
+            delete room.recorder;
+
+            callback({ success: true });
+        } catch (error: any) {
+            console.error('❌ stop-recording error:', error);
+            callback({ success: false, error: error.message });
+        }
+    });
+
     // Disconnect
     socket.on('disconnect', () => {
         console.log(`🔌 Client disconnected: ${socket.id}`);

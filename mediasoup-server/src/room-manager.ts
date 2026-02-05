@@ -1,4 +1,5 @@
 import { Router, Producer, Consumer, WebRtcTransport, RtpCapabilities } from 'mediasoup/node/lib/types';
+import { Recorder } from './recorder';
 
 export interface Room {
     id: string;
@@ -6,6 +7,7 @@ export interface Room {
     producer?: Producer; // The device streaming
     consumers: Map<string, Consumer>; // Viewers
     transports: Map<string, WebRtcTransport>;
+    recorder?: Recorder;
 }
 
 export class RoomManager {
