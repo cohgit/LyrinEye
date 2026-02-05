@@ -154,6 +154,10 @@ resource "azurerm_linux_virtual_machine" "mediasoup" {
     backend_url           = "https://${azurerm_container_app.backend.latest_revision_fqdn}"
   }))
 
+  lifecycle {
+    ignore_changes = [custom_data]
+  }
+
   tags = {
     Environment = var.environment
     Component   = "Mediasoup-SFU"
