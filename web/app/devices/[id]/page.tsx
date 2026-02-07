@@ -59,18 +59,21 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                         Volver al Dashboard
                     </Link>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                                {device.name}
-                                <span className="text-slate-500 text-lg font-normal">({device.id})</span>
-                                {(device.isTransmitting || device.streaming) && (
-                                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-400 text-xs border border-indigo-500/30 animate-pulse">
-                                        <Radio className="w-3 h-3" />
-                                        Transmitiendo
-                                    </span>
-                                )}
-                            </h1>
-                            <p className="text-sm text-slate-400">{device.appVersion}</p>
+                        <div className="flex items-center gap-4">
+                            <img src="/app-icon.png" alt="Device Icon" className="w-14 h-14 rounded-2xl shadow-xl border border-slate-700" />
+                            <div>
+                                <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+                                    {device.name}
+                                    <span className="text-slate-500 text-lg font-normal">({device.id})</span>
+                                    {(device.isTransmitting || device.streaming) && (
+                                        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-400 text-xs border border-indigo-500/30 animate-pulse">
+                                            <Radio className="w-3 h-3" />
+                                            Transmitiendo
+                                        </span>
+                                    )}
+                                </h1>
+                                <p className="text-sm text-slate-400">{device.appVersion}</p>
+                            </div>
                         </div>
                         <div className="flex items-center gap-4">
                             <DeviceActions deviceId={id} isEnabled={showMetrics} />

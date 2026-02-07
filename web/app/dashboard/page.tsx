@@ -13,9 +13,12 @@ export default async function DashboardPage() {
             {/* Header */}
             <header className="border-b border-slate-700 bg-slate-800/50 backdrop-blur-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-white">LyrinEye Admin</h1>
-                        <p className="text-sm text-slate-400">{session?.user?.email}</p>
+                    <div className="flex items-center gap-3">
+                        <img src="/app-icon.png" alt="LyrinEye Logo" className="w-10 h-10 rounded-xl shadow-lg border border-slate-700" />
+                        <div>
+                            <h1 className="text-2xl font-bold text-white">LyrinEye Admin</h1>
+                            <p className="text-sm text-slate-400">{session?.user?.email}</p>
+                        </div>
                     </div>
                     <form
                         action={async () => {
@@ -69,23 +72,27 @@ export default async function DashboardPage() {
                             <Link
                                 key={device.id}
                                 href={`/devices/${device.id}`}
-                                className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-slate-600 transition-all duration-200 hover:scale-[1.02]"
+                                className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-slate-600 transition-all duration-200 hover:scale-[1.02] flex flex-col gap-4"
                             >
                                 {/* Status Badge */}
-                                <div>
-                                    <h3 className="text-lg font-semibold text-white">{device.name} <span className="text-slate-500 text-sm font-normal">({device.id})</span></h3>
-                                    {device.appVersion && (
-                                        <p className="text-xs text-slate-400 mt-0.5">{device.appVersion}</p>
-                                    )}
-                                    <div className="flex gap-2.5 mt-1">
-                                        <span className={`px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
-                                            {statusLabel}
-                                        </span>
-                                        {device.mode && (
-                                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                                                Modo: {device.mode.charAt(0).toUpperCase() + device.mode.slice(1)}
-                                            </span>
+                                <div className="flex items-start gap-4">
+                                    <img src="/app-icon.png" alt="Device Icon" className="w-12 h-12 rounded-xl border border-slate-700/50" />
+                                    <div className="flex-1">
+                                        <h3 className="text-lg font-semibold text-white line-clamp-1">{device.name}</h3>
+                                        <p className="text-slate-500 text-xs font-normal">({device.id})</p>
+                                        {device.appVersion && (
+                                            <p className="text-[10px] text-slate-400 mt-0.5">{device.appVersion}</p>
                                         )}
+                                        <div className="flex gap-2.5 mt-2">
+                                            <span className={`px-3 py-0.5 rounded-full text-[10px] font-medium ${statusColor}`}>
+                                                {statusLabel}
+                                            </span>
+                                            {device.mode && (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                                    {device.mode.charAt(0).toUpperCase() + device.mode.slice(1)}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
