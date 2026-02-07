@@ -19,23 +19,9 @@ export async function getDevices(email?: string): Promise<Device[]> {
             timeout: 5000
         });
         return response.data;
-    } catch (error) {
-        console.error('Failed to fetch devices:', error);
-        // Fallback for development if backend is not reachable
-        return [
-            {
-                id: 'nokia-2',
-                name: 'Nokia 2',
-                lastSeen: new Date().toISOString(),
-                status: 'online',
-                battery: 0.85,
-                cpu: 12.5,
-                ram: 450,
-                isCharging: false,
-                isTransmitting: false,
-                isRecording: false
-            },
-        ];
+    } catch (error: any) {
+        console.error('Failed to fetch devices:', error.message || error);
+        return [];
     }
 }
 
@@ -45,29 +31,9 @@ export async function getDeviceDetails(deviceId: string): Promise<DeviceDetail |
             timeout: 5000
         });
         return response.data;
-    } catch (error) {
-        console.error(`Failed to fetch device details for ${deviceId}:`, error);
-        // Fallback for development
-        return {
-            id: deviceId,
-            name: 'Device ' + deviceId,
-            lastSeen: new Date().toISOString(),
-            status: 'online',
-            battery: 0.85,
-            cpu: 12.5,
-            ram: 450,
-            isCharging: false,
-            isTransmitting: false, // Added property
-            isRecording: false,    // Added property
-            androidVersion: '13',
-            appVersion: 'v1.0.0',
-            wifiSSID: 'LyrinEye_Secure',
-            telemetry: [],         // Ensure this matches types
-            location: {
-                latitude: -33.45,
-                longitude: -70.66
-            }
-        };
+    } catch (error: any) {
+        console.error(`Failed to fetch device details for ${deviceId}:`, error.message || error);
+        return null;
     }
 }
 

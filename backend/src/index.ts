@@ -518,8 +518,12 @@ app.get('/api/devices/:id', async (req, res) => {
         const ramUsed = getVal(telemetry, 'RamUsedMB');
         const batteryStatus = getVal(telemetry, 'BatteryStatus');
         const lowPowerMode = getVal(telemetry, 'LowPowerMode');
+        const lat = getVal(telemetry, 'Latitude');
+        const lon = getVal(telemetry, 'Longitude');
 
-        const deviceData = {
+        console.log(`[DEVICES] Found telemetry for ${deviceId}: ${telemetry ? 'YES' : 'NO'}`);
+
+        const deviceData: any = {
             id: deviceId,
             name: deviceName || (deviceEntity as any)?.name || deviceId.substring(0, 8),
             status: 'online',
@@ -543,6 +547,13 @@ app.get('/api/devices/:id', async (req, res) => {
             lowPowerMode: lowPowerMode === 'Yes' || lowPowerMode === true || lowPowerMode === "true",
             telemetry: telemetry || {}
         };
+
+        if (lat && lon && lat !== 'N/A' && lon !== 'N/A') {
+            deviceData.location = {
+                latitude: parseFloat(lat),
+                longitude: parseFloat(lon)
+            };
+        }
 
         // Recalculate isRecording based on lastRecordingAt (from recordings table)
         if ((deviceEntity as any)?.lastRecordingAt) {
