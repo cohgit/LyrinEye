@@ -10,6 +10,7 @@ export interface Device {
     isTransmitting: boolean
     isRecording: boolean
     mode?: string
+    appVersion?: string
 }
 
 export interface TelemetryData {

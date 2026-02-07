@@ -74,6 +74,9 @@ export default async function DashboardPage() {
                                 {/* Status Badge */}
                                 <div>
                                     <h3 className="text-lg font-semibold text-white">{device.name} <span className="text-slate-500 text-sm font-normal">({device.id})</span></h3>
+                                    {device.appVersion && (
+                                        <p className="text-xs text-slate-400 mt-0.5">{device.appVersion}</p>
+                                    )}
                                     <div className="flex gap-2.5 mt-1">
                                         <span className={`px-3 py-0.5 rounded-full text-xs font-medium ${statusColor}`}>
                                             {statusLabel}

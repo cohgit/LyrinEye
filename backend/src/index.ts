@@ -417,13 +417,29 @@ app.get('/api/devices', async (req, res) => {
         const normalizedEmail = email.toLowerCase();
         console.log(`[DEVICES] Fetching devices for user: ${normalizedEmail}`);
 
-        const deviceEntities = userDevicesClient.listEntities({
+        const deviceEntities = [];
+        const deviceIds = [];
+        const entities = userDevicesClient.listEntities({
             queryOptions: { filter: `PartitionKey eq '${normalizedEmail}'` }
         });
 
-        const devices = [];
-        for await (const entity of deviceEntities) {
-            const isTransmitting = LogcatService.isSessionActive(entity.rowKey as string);
+        for await (const entity of entities) {
+            deviceEntities.push(entity);
+            deviceIds.push(entity.rowKey as string);
+        }
+
+        const telemetries = await LogcatService.getLatestTelemetries(deviceIds);
+
+        // Helper to get value regardless of Azure suffix (_s, _d, _b)
+        const getVal = (obj: any, baseKey: string) => {
+            if (!obj) return null;
+            return obj[baseKey] ?? obj[`${baseKey}_s`] ?? obj[`${baseKey}_d`] ?? obj[`${baseKey}_b`] ?? obj[`${baseKey}_g`];
+        };
+
+        const devices = deviceEntities.map(entity => {
+            const deviceId = entity.rowKey as string;
+            const isTransmitting = LogcatService.isSessionActive(deviceId);
+            const telemetry = telemetries.get(deviceId);
 
             // Recording status: was there an upload in the last 2 minutes?
             let isRecording = false;
@@ -432,22 +448,26 @@ app.get('/api/devices', async (req, res) => {
                 isRecording = (Date.now() - lastRec) < 120000;
             }
 
-            devices.push({
-                id: entity.rowKey,
-                name: entity.name || (entity.rowKey as string).substring(0, 8),
+            const deviceName = getVal(telemetry, 'DeviceName');
+            const appVer = getVal(telemetry, 'AppVersion');
+            const androidVer = getVal(telemetry, 'AndroidVersion');
+
+            return {
+                id: deviceId,
+                name: deviceName || entity.name || deviceId.substring(0, 8),
                 status: 'online',
-                battery: (entity.battery as number) || null,
-                cpu: (entity.cpu as number) || null,
-                ram: (entity.ram as number) || null,
+                battery: (entity.battery as number) || getVal(telemetry, 'BatteryLevel') || null,
+                cpu: (entity.cpu as number) || getVal(telemetry, 'CPUUsage') || null,
+                ram: (entity.ram as number) || getVal(telemetry, 'RamTotalMB') || null,
                 lastSeen: isTransmitting || isRecording ? new Date().toISOString() : (entity.registeredAt || new Date().toISOString()),
-                isCharging: false,
+                isCharging: getVal(telemetry, 'IsCharging') === true || getVal(telemetry, 'IsCharging') === "true",
                 isTransmitting: isTransmitting,
                 isRecording: isRecording,
-                wifiSSID: entity.wifiSSID || null,
-                appVersion: entity.appVersion || null,
-                androidVersion: entity.androidVersion || null
-            });
-        }
+                wifiSSID: entity.wifiSSID || getVal(telemetry, 'WifiSSID') || null,
+                appVersion: appVer || entity.appVersion || null,
+                androidVersion: androidVer || entity.androidVersion || null
+            };
+        });
 
         res.send(devices);
     } catch (error: any) {

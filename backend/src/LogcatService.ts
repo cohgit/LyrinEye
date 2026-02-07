@@ -279,6 +279,52 @@ export async function getLatestTelemetry(deviceId: string) {
     }
 }
 
+export async function getLatestTelemetries(deviceIds: string[]) {
+    if (!WORKSPACE_ID || deviceIds.length === 0) return new Map<string, any>();
+
+    try {
+        // Robust query on new Telemetry table for multiple devices
+        // We use summarize arg_max to get the latest record for each device
+        const idList = deviceIds.map(id => `"${id}"`).join(', ');
+        const query = `LyrinEye_Mobile_Telemetry_CL 
+            | where column_ifexists('DeviceName', '') in~ (${idList}) or column_ifexists('DeviceId_s', '') in (${idList}) or column_ifexists('DeviceId', '') in (${idList})
+            | summarize arg_max(TimeGenerated, *) by DeviceId = coalesce(column_ifexists('DeviceName', ''), column_ifexists('DeviceId_s', ''), column_ifexists('DeviceId', ''))`;
+
+        const result = await logsQueryClient.queryWorkspace(
+            WORKSPACE_ID,
+            query,
+            { duration: 'P30D' as any }
+        );
+
+        const telemetries = new Map<string, any>();
+        if (result.status === 'Success') {
+            const table = result.tables[0];
+            table.rows.forEach(row => {
+                const entry: any = {};
+                table.columnDescriptors.forEach((col, idx) => {
+                    const colName = col.name as string;
+                    if (colName) entry[colName] = row[idx];
+                });
+
+                // Try to find which ID matched
+                const matchedId = deviceIds.find(id =>
+                    (entry.DeviceName && entry.DeviceName.toLowerCase() === id.toLowerCase()) ||
+                    (entry.DeviceId_s === id) ||
+                    (entry.DeviceId === id)
+                );
+
+                if (matchedId) {
+                    telemetries.set(matchedId, entry);
+                }
+            });
+        }
+        return telemetries;
+    } catch (error: any) {
+        console.error('[TELEMETRY] Error batch querying telemetry:', error.message);
+        return new Map<string, any>();
+    }
+}
+
 const recordingsTableClient = TableClient.fromConnectionString(CONNECTION_STRING, 'camerametadata');
 
 export async function getLogStats(deviceId: string, start: string, end: string, granularity: '1d' | '1h' | '1m') {
