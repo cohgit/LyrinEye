@@ -1,7 +1,21 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, StatusBar, Switch } from 'react-native';
 import { authService } from '../utils/AuthService';
+import { LogcatCapture } from '../utils/LogcatCapture';
 
 const HomeScreen = ({ navigation }: any) => {
+  const [isLogcatActive, setIsLogcatActive] = useState(LogcatCapture.getStreamingStatus());
+
+  const toggleLogcat = async () => {
+    if (isLogcatActive) {
+      LogcatCapture.stopStreaming();
+      setIsLogcatActive(false);
+    } else {
+      await LogcatCapture.startStreaming();
+      setIsLogcatActive(true);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
@@ -11,6 +25,19 @@ const HomeScreen = ({ navigation }: any) => {
       </View>
 
       <View style={styles.cardContainer}>
+        <View style={styles.logcatRow}>
+          <View>
+            <Text style={styles.logcatTitle}>Transmitir Logcat</Text>
+            <Text style={styles.logcatSubtitle}>Enviar registros al sistema</Text>
+          </View>
+          <Switch
+            value={isLogcatActive}
+            onValueChange={toggleLogcat}
+            trackColor={{ false: '#334155', true: '#38BDF8' }}
+            thumbColor={isLogcatActive ? '#F8FAFC' : '#94A3B8'}
+          />
+        </View>
+
         <TouchableOpacity
           style={[styles.card, styles.monitorCard]}
           onPress={() => navigation.navigate('Monitor')}
