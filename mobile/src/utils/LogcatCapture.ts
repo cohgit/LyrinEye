@@ -2,7 +2,8 @@ import RNFS from 'react-native-fs';
 import { Platform, PermissionsAndroid } from 'react-native';
 import axios from 'axios';
 import DeviceInfo from 'react-native-device-info';
-import { CONFIG } from '../config';
+
+const BACKEND_URL = 'https://lyrineye-backend.icymoss-5b66c974.eastus.azurecontainerapps.io';
 
 export interface LogcatEntry {
     timestamp: string;
@@ -13,9 +14,6 @@ export interface LogcatEntry {
 }
 
 class LogcatCaptureService {
-    private isStreaming = false;
-    private intervalId: any = null;
-
     async captureLastN(lines: number = 500): Promise<LogcatEntry[]> {
         if (Platform.OS !== 'android') {
             console.warn('[LOGCAT] Only supported on Android');
@@ -23,8 +21,17 @@ class LogcatCaptureService {
         }
 
         try {
+            // Note: READ_LOGS permission is restricted in Android
+            // This will only work in debug builds or on rooted devices
+            console.log(`[LOGCAT] Attempting to capture last ${lines} logs...`);
+
+            // Try to read from /proc/kmsg or use logcat command
+            // In most cases, this will require root or adb
             const logcatOutput = await this.executeLogcat(lines);
+
             const entries = this.parseLogcat(logcatOutput);
+            console.log(`[LOGCAT] Captured ${entries.length} log entries`);
+
             return entries;
         } catch (error) {
             console.error('[LOGCAT] Failed to capture logs:', error);
@@ -33,21 +40,21 @@ class LogcatCaptureService {
     }
 
     private async executeLogcat(lines: number): Promise<string> {
-        // In a real production app with proper signing and sharedUserId/system permissions, 
-        // we'd use native modules to execute `logcat`. 
-        // For this demo and development, we'll simulate the capture with relevant system info.
+        // Attempt to execute logcat command
+        // This requires READ_LOGS permission or adb/root access
+        try {
+            // On most devices, this will fail due to permission restrictions
+            // Alternative: Use adb bridge or request user to enable developer options
 
-        const now = new Date();
-        const ts = (d: Date) => `${d.getMonth() + 1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}.${d.getMilliseconds()}`;
-
-        const mockLogs = [
-            `${ts(now)}  ${process.pid}  ${process.pid} I LyrinEye: Mobile logcat transmission active`,
-            `${ts(now)}  ${process.pid}  ${process.pid} D Network : Pinging backend ${CONFIG.SIGNALING_SERVER}`,
-            `${ts(now)}  ${process.pid}  ${process.pid} I Battery : Level ${Math.random().toFixed(2)}`,
-            `${ts(now)}  ${process.pid}  ${process.pid} W System  : Memory pressure LOW`
-        ].join('\n');
-
-        return mockLogs;
+            // For now, return a mock entry indicating the limitation
+            return `01-01 00:00:00.000  1234  1234 I LyrinEye: Logcat capture requires READ_LOGS permission or adb access
+01-01 00:00:00.001  1234  1234 W System  : This is a demonstration log entry
+01-01 00:00:00.002  1234  1234 E LyrinEye: To enable full logcat capture:
+01-01 00:00:00.003  1234  1234 I LyrinEye: 1. Connect device to adb
+01-01 00:00:00.004  1234  1234 I LyrinEye: 2. Run: adb shell pm grant com.mobile.lyrineye.app android.permission.READ_LOGS`;
+        } catch (error) {
+            throw new Error('Failed to execute logcat command');
+        }
     }
 
     private parseLogcat(output: string): LogcatEntry[] {
@@ -55,6 +62,7 @@ class LogcatCaptureService {
         const lines = output.split('\n');
 
         for (const line of lines) {
+            // Parse Android logcat format: MM-DD HH:MM:SS.mmm  PID  TID PRIORITY TAG: Message
             const match = line.match(
                 /^(\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3})\s+(\d+)\s+(\d+)\s+([A-Z])\s+(.+?):\s+(.+)$/
             );
@@ -62,13 +70,14 @@ class LogcatCaptureService {
             if (match) {
                 const [, timestamp, pid, , priority, tag, message] = match;
                 entries.push({
-                    timestamp: new Date().toISOString(),
+                    timestamp: new Date().toISOString(), // Convert to ISO
                     pid: parseInt(pid, 10),
                     priority,
                     tag,
                     message,
                 });
             } else if (line.trim()) {
+                // Fallback for lines that don't match the standard format
                 entries.push({
                     timestamp: new Date().toISOString(),
                     message: line,
@@ -82,45 +91,28 @@ class LogcatCaptureService {
     async sendToBackend(logs: LogcatEntry[]): Promise<void> {
         try {
             const deviceId = await DeviceInfo.getUniqueId();
-            await axios.post(`${CONFIG.SIGNALING_SERVER}/api/devices/${deviceId}/logcat`, {
+
+            await axios.post(`${BACKEND_URL}/api/devices/${deviceId}/logcat`, {
                 logs,
             });
-            console.log(`[LOGCAT] Sent ${logs.length} logs`);
+
+            console.log(`[LOGCAT] Successfully sent ${logs.length} logs to backend`);
         } catch (error) {
-            console.error('[LOGCAT] Failed to send logs:', error);
+            console.error('[LOGCAT] Failed to send logs to backend:', error);
+            throw error;
         }
     }
 
-    async startStreaming() {
-        if (this.isStreaming) return;
-        this.isStreaming = true;
+    async captureAndSend(): Promise<void> {
+        console.log('[LOGCAT] Starting capture and send process...');
+        const logs = await this.captureLastN(500);
 
-        console.log('[LOGCAT] Starting stream...');
-
-        // Initial send
-        const initialLogs = await this.captureLastN(100);
-        await this.sendToBackend(initialLogs);
-
-        this.intervalId = setInterval(async () => {
-            if (!this.isStreaming) return;
-            const logs = await this.captureLastN(20);
-            if (logs.length > 0) {
-                await this.sendToBackend(logs);
-            }
-        }, 10000); // Every 10 seconds
-    }
-
-    stopStreaming() {
-        this.isStreaming = false;
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
+        if (logs.length === 0) {
+            console.warn('[LOGCAT] No logs captured');
+            return;
         }
-        console.log('[LOGCAT] Stream stopped');
-    }
 
-    getStreamingStatus() {
-        return this.isStreaming;
+        await this.sendToBackend(logs);
     }
 }
 
