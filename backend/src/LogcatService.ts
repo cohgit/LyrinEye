@@ -250,6 +250,52 @@ export async function queryWebLogs(kqlQuery?: string, timespan: string = 'PT1H')
     }
 }
 
+export async function queryGenericLogs(tableName: string, kqlQuery?: string, timespan: string = 'PT1H') {
+    if (!WORKSPACE_ID) return [];
+
+    try {
+        const finalQuery = kqlQuery ? `${tableName} | ${kqlQuery}` : `${tableName} | order by TimeGenerated desc | take 200`;
+
+        const result = await logsQueryClient.queryWorkspace(
+            WORKSPACE_ID,
+            finalQuery,
+            { duration: timespan as any }
+        );
+
+        if (result.status === 'Success') {
+            const table = result.tables[0];
+            return table.rows.map(row => {
+                const entry: any = {};
+                table.columnDescriptors.forEach((col, idx) => {
+                    const colName = col.name as string;
+                    if (colName) entry[colName] = row[idx];
+                });
+                return entry;
+            });
+        }
+        return [];
+    } catch (error: any) {
+        console.error(`[LOGS] Error querying table ${tableName}:`, error.message);
+        return [];
+    }
+}
+
+export async function getAvailableTables() {
+    if (!WORKSPACE_ID) return [];
+    try {
+        const query = "union * | summarize count() by Type";
+        const result = await logsQueryClient.queryWorkspace(WORKSPACE_ID, query, { duration: 'P30D' as any });
+        if (result.status === 'Success') {
+            const table = result.tables[0];
+            return table.rows.map(row => row[0]); // Type column is index 0
+        }
+        return [];
+    } catch (error) {
+        console.error('[LOGS] Error fetching tables:', error);
+        return [];
+    }
+}
+
 export async function getLatestTelemetry(deviceId: string) {
     if (!WORKSPACE_ID) return null;
 

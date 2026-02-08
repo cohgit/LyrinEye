@@ -82,3 +82,25 @@ export async function getRecordings(deviceId: string, startTime?: string, endTim
         return [];
     }
 }
+
+export async function getSystemTables(): Promise<string[]> {
+    try {
+        const response = await axios.get(`${getBaseUrl()}/api/system/tables`);
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch system tables:', error);
+        return [];
+    }
+}
+
+export async function getSystemLogs(params: { table: string, query?: string, timespan: string }): Promise<any[]> {
+    try {
+        const response = await axios.get(`${getBaseUrl()}/api/system/logs`, {
+            params
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Failed to fetch system logs:', error);
+        return [];
+    }
+}

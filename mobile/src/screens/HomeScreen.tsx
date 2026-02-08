@@ -67,7 +67,28 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     flex: 1,
-    gap: 20,
+    gap: 16,
+  },
+  logcatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(51, 65, 85, 0.4)',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(56, 189, 248, 0.1)',
+    marginBottom: 4,
+  },
+  logcatTitle: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  logcatSubtitle: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: 2,
   },
   card: {
     flex: 1,

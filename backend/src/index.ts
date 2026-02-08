@@ -680,6 +680,33 @@ app.get('/api/web/logs', async (req, res) => {
     }
 });
 
+// Generic System Logs
+app.get('/api/system/tables', async (req, res) => {
+    try {
+        const tables = await LogcatService.getAvailableTables();
+        res.send(tables);
+    } catch (error: any) {
+        res.status(500).send({ error: error.message });
+    }
+});
+
+app.get('/api/system/logs', async (req, res) => {
+    try {
+        const { table, query, timespan } = req.query;
+        if (!table) return res.status(400).send({ error: 'table parameter is required' });
+
+        const logs = await LogcatService.queryGenericLogs(
+            table as string,
+            query as string,
+            timespan as string || 'PT1H'
+        );
+        res.send(logs);
+    } catch (error: any) {
+        console.error(`[SYSTEM-LOGS] Failed to query logs:`, error);
+        res.status(500).send({ error: error.message });
+    }
+});
+
 // Receive Logcat from Device
 app.post('/api/devices/:id/logcat', async (req, res) => {
     try {

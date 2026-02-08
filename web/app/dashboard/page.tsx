@@ -3,6 +3,7 @@ import { getDevices } from "@/lib/api"
 import Link from "next/link"
 import { format, formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
+import SystemLogsViewer from "@/app/components/SystemLogsViewer"
 
 export default async function DashboardPage() {
     const session = await auth()
@@ -38,6 +39,11 @@ export default async function DashboardPage() {
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {/* System Section */}
+                <div className="mb-12">
+                    <SystemLogsViewer />
+                </div>
+
                 <div className="mb-8">
                     <h2 className="text-xl font-semibold text-white mb-2">Dispositivos</h2>
                     <p className="text-slate-400">
