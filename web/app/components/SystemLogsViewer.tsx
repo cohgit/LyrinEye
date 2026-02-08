@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Terminal,
     Search,
     RefreshCw,
     Table,
     Clock,
-    Filter,
     ChevronDown,
     ChevronUp,
     Download,
@@ -35,11 +34,9 @@ export default function SystemLogsViewer() {
     useEffect(() => {
         const loadTables = async () => {
             const fetchedTables = await getSystemTables();
-            // Filter out internal tables or system tables if needed
             const customTables = fetchedTables.filter(t => t.endsWith('_CL')).sort();
             setTables(customTables);
             if (customTables.length > 0) {
-                // Priority table
                 const initial = customTables.find(t => t.includes('Mobile_Log')) || customTables[0];
                 setSelectedTable(initial);
             }
@@ -57,10 +54,8 @@ export default function SystemLogsViewer() {
         setIsLoading(true);
         setError(null);
         try {
-            // Simple text search logic for KQL
             let kql = 'order by TimeGenerated desc | take 200';
             if (query) {
-                // Try to find a message/text column or search all
                 kql = `where * has "${query}" | ` + kql;
             }
 
@@ -101,13 +96,12 @@ export default function SystemLogsViewer() {
 
     const getKeys = () => {
         if (logs.length === 0) return [];
-        // Extract common keys, prioritizing TimeGenerated and important fields
         const keys = Object.keys(logs[0]);
         const priority = ['TimeGenerated', 'LogText_s', 'Message_s', 'message', 'Level_s', 'priority', 'DeviceName_s', 'Type'];
         return [
             ...priority.filter(k => keys.includes(k)),
             ...keys.filter(k => !priority.includes(k))
-        ].slice(0, 7); // Limit visible columns
+        ].slice(0, 7);
     };
 
     return (
@@ -126,7 +120,6 @@ export default function SystemLogsViewer() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
-                        {/* Table Select */}
                         <div className="relative group">
                             <Table className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-hover:text-indigo-400 transition-colors" size={14} />
                             <select
@@ -141,7 +134,6 @@ export default function SystemLogsViewer() {
                             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" size={12} />
                         </div>
 
-                        {/* Range Select */}
                         <div className="relative group">
                             <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-hover:text-indigo-400 transition-colors" size={14} />
                             <select
@@ -178,7 +170,6 @@ export default function SystemLogsViewer() {
                     </div>
                 </div>
 
-                {/* Filter Input */}
                 <form onSubmit={handleSearch} className="mt-4 flex gap-2">
                     <div className="relative flex-grow">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
@@ -223,32 +214,37 @@ export default function SystemLogsViewer() {
                         <p className="text-sm italic">No se encontraron registros para el periodo seleccionado</p>
                     </div>
                 ) : (
-                    <table className="w-full border-collapse text-[12px]">
-                        <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 z-10 shadow-sm">
-                            <tr>
-                                <th className="w-10"></th>
-                                {getKeys().map(key => (
-                                    <th key={key} className="text-left py-3 px-4 font-semibold text-slate-400 uppercase tracking-wider">
-                                        {key.replace('_s', '').replace('_d', '').replace('_b', '')}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/50">
-                            {logs.map((log, idx) => (
-                                <details key={idx} className="group/row">
-                                    <summary className="list-none cursor-pointer">
-                                        <tr className="hover:bg-indigo-500/5 transition-colors group-hover/row:bg-indigo-500/5">
-                                            <td className="py-3 px-4 flex items-center justify-center">
-                                                <ChevronDown size={14} className="text-slate-600 group-open:rotate-180 transition-transform" />
-                                            </td>
+                    <div className="w-full text-[12px]">
+                        {/* Header */}
+                        <div className="sticky top-0 bg-slate-900 border-b border-slate-800 z-10 flex px-4 shadow-sm">
+                            <div className="w-10"></div>
+                            {getKeys().map(key => (
+                                <div key={key} className="flex-1 py-3 px-2 font-semibold text-slate-400 uppercase tracking-wider overflow-hidden text-ellipsis whitespace-nowrap">
+                                    {key.replace('_s', '').replace('_d', '').replace('_b', '')}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Rows */}
+                        <div className="divide-y divide-slate-800/50">
+                            {logs.map((log, idx) => {
+                                const isExpanded = expandedRow === idx;
+                                return (
+                                    <div key={idx} className="group/row">
+                                        <div
+                                            onClick={() => setExpandedRow(isExpanded ? null : idx)}
+                                            className="flex items-center px-4 hover:bg-indigo-500/5 transition-colors cursor-pointer"
+                                        >
+                                            <div className="w-10 py-3 flex items-center justify-center">
+                                                {isExpanded ? <ChevronUp size={14} className="text-indigo-400" /> : <ChevronDown size={14} className="text-slate-600 group-hover/row:text-slate-400" />}
+                                            </div>
                                             {getKeys().map(key => {
                                                 const val = log[key];
                                                 const isTime = key === 'TimeGenerated';
                                                 const isLevel = key.toLowerCase().includes('level') || key.toLowerCase().includes('priority');
 
                                                 return (
-                                                    <td key={key} className="py-3 px-4 text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis max-w-[300px]">
+                                                    <div key={key} className="flex-1 py-3 px-2 text-slate-300 whitespace-nowrap overflow-hidden text-ellipsis">
                                                         {isTime ? (
                                                             <span className="text-slate-500 font-mono">
                                                                 {new Date(val).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -263,28 +259,31 @@ export default function SystemLogsViewer() {
                                                         ) : (
                                                             val === null || val === undefined ? '-' : String(val)
                                                         )}
-                                                    </td>
+                                                    </div>
                                                 );
                                             })}
-                                        </tr>
-                                    </summary>
-                                    <div className="bg-slate-950/80 p-5 px-14 border-y border-slate-800/50 text-xs">
-                                        <h4 className="text-indigo-400 font-bold mb-3 uppercase tracking-widest text-[10px]">Detalle Completo del Registro</h4>
-                                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-y-3 gap-x-8">
-                                            {Object.entries(log).sort().map(([k, v]) => (
-                                                <div key={k} className="flex flex-col gap-1">
-                                                    <span className="text-slate-600 font-semibold">{k}</span>
-                                                    <span className="text-slate-300 break-all font-mono bg-slate-900/50 p-1.5 rounded-lg border border-slate-800/50">
-                                                        {String(v)}
-                                                    </span>
-                                                </div>
-                                            ))}
                                         </div>
+
+                                        {isExpanded && (
+                                            <div className="bg-slate-950/80 p-6 px-14 border-y border-slate-800/50">
+                                                <h4 className="text-indigo-400 font-bold mb-4 uppercase tracking-widest text-[10px]">Detalle Completo del Registro</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-4 gap-x-8">
+                                                    {Object.entries(log).sort().map(([k, v]) => (
+                                                        <div key={k} className="flex flex-col gap-1">
+                                                            <span className="text-slate-600 font-semibold">{k}</span>
+                                                            <span className="text-slate-300 break-all font-mono bg-slate-900/50 p-2 rounded-lg border border-slate-800/50">
+                                                                {String(v)}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                </details>
-                            ))}
-                        </tbody>
-                    </table>
+                                );
+                            })}
+                        </div>
+                    </div>
                 )}
             </div>
 
@@ -302,15 +301,6 @@ export default function SystemLogsViewer() {
                     Log Engine V2 • {new Date().toLocaleTimeString()}
                 </div>
             </div>
-
-            <style jsx>{`
-                details summary::-webkit-details-marker {
-                    display: none;
-                }
-                summary {
-                    display: block;
-                }
-            `}</style>
         </div>
     );
 }
