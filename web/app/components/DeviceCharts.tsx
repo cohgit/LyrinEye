@@ -86,8 +86,8 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                         key={r.value}
                         onClick={() => setRange(r.value)}
                         className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${range === r.value
-                                ? 'bg-indigo-500 text-white shadow-lg'
-                                : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                            ? 'bg-indigo-500 text-white shadow-lg'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-700'
                             }`}
                     >
                         {r.label}
@@ -149,6 +149,16 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                                         stroke="#818cf8"
                                         fillOpacity={1}
                                         fill="url(#colorCpu)"
+                                        unit="%"
+                                        strokeWidth={2}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="ram"
+                                        name="RAM"
+                                        stroke="#34d399"
+                                        fillOpacity={1}
+                                        fill="url(#colorRam)"
                                         unit="%"
                                         strokeWidth={2}
                                     />

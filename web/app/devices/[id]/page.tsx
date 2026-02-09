@@ -134,7 +134,11 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                                     <dd className="text-sm text-white mt-1">
                                         {device.mode ? (
                                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 capitalize">
-                                                {device.mode}
+                                                {device.mode === 'owner' ? 'Propietario' :
+                                                    device.mode === 'kiosk' ? 'Kiosco' :
+                                                        device.mode === 'lock-task' ? 'Bloqueo de Tareas' :
+                                                            device.mode === 'default' ? 'Por Defecto' :
+                                                                device.mode}
                                             </span>
                                         ) : 'Desconocido'}
                                     </dd>
@@ -142,7 +146,17 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                                 <div>
                                     <dt className="text-sm text-slate-400">Estado Batería</dt>
                                     <dd className="text-sm text-white mt-1 capitalize">
-                                        {device.batteryStatus || 'Desconocido'}
+                                        {(() => {
+                                            const status = (device.batteryStatus || 'unknown').toLowerCase();
+                                            switch (status) {
+                                                case 'charging': return 'Cargando';
+                                                case 'discharging': return 'Descargando';
+                                                case 'full': return 'Completa';
+                                                case 'not_charging': return 'No Cargando';
+                                                case 'unknown': return 'Desconocido';
+                                                default: return status;
+                                            }
+                                        })()}
                                         {device.lowPowerMode && <span className="ml-2 text-xs text-yellow-500">(Ahorro activado)</span>}
                                     </dd>
                                 </div>

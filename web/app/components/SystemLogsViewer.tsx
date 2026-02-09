@@ -30,7 +30,7 @@ export default function SystemLogsViewer() {
     const [timespan, setTimespan] = useState('PT1H');
     const [error, setError] = useState<string | null>(null);
     const [expandedRow, setExpandedRow] = useState<number | null>(null);
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isCollapsed, setIsCollapsed] = useState(true);
 
     useEffect(() => {
         const loadTables = async () => {
@@ -272,8 +272,8 @@ export default function SystemLogsViewer() {
                                                                     </span>
                                                                 ) : isLevel ? (
                                                                     <span className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-bold ${val === 'ERROR' || val === 'E' ? 'bg-red-900/30 text-red-400' :
-                                                                            val === 'WARNING' || val === 'W' ? 'bg-yellow-900/30 text-yellow-500' :
-                                                                                'bg-slate-800 text-slate-400'
+                                                                        val === 'WARNING' || val === 'W' ? 'bg-yellow-900/30 text-yellow-500' :
+                                                                            'bg-slate-800 text-slate-400'
                                                                         }`}>
                                                                         {val}
                                                                     </span>

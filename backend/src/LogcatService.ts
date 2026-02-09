@@ -489,7 +489,7 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
             | where TimeGenerated between (datetime("${start}") .. datetime("${end}"))
             | summarize 
                 AvgCPU = avg(todouble(column_ifexists('CPUUsage', '0'))),
-                AvgRAM = avg(todouble(column_ifexists('RamTotalMB', '0')) - todouble(column_ifexists('RamUsedMB', '0'))),
+                AvgRAM = avg(todouble(column_ifexists('RamUsedMB', '0')) / iff(todouble(column_ifexists('RamTotalMB', '0')) == 0, 1.0, todouble(column_ifexists('RamTotalMB', '0'))) * 100),
                 AvgBattery = avg(todouble(column_ifexists('BatteryLevel', '0'))),
                 AvgDisk = avg(todouble(column_ifexists('StorageFreeMB', '0')))
               by Timestamp=bin(TimeGenerated, ${granularity})
@@ -503,7 +503,7 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
 
         if (result.status === 'Success') {
             const table = result.tables[0];
-            return table.rows.map(row => {
+            return result.tables[0].rows.map(row => {
                 const entry: any = {};
                 table.columnDescriptors.forEach((col, idx) => {
                     const colName = col.name as string;
@@ -512,7 +512,7 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
                 return {
                     timestamp: entry.Timestamp,
                     cpu: entry.AvgCPU,
-                    ramFree: entry.AvgRAM, // This is actually Total - Used if we did the calculation right, or we can just send Used
+                    ram: entry.AvgRAM,
                     battery: entry.AvgBattery,
                     diskFree: entry.AvgDisk
                 };
