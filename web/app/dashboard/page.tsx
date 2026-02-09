@@ -39,11 +39,6 @@ export default async function DashboardPage() {
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* System Section */}
-                <div className="mb-12">
-                    <SystemLogsViewer />
-                </div>
-
                 <div className="mb-8">
                     <h2 className="text-xl font-semibold text-white mb-2">Dispositivos</h2>
                     <p className="text-slate-400">
@@ -51,7 +46,7 @@ export default async function DashboardPage() {
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
                     {devices.map((device) => {
                         const lastSeenDate = new Date(device.lastSeen);
                         const diffMs = Date.now() - lastSeenDate.getTime();
@@ -156,10 +151,16 @@ export default async function DashboardPage() {
                 </div>
 
                 {devices.length === 0 && (
-                    <div className="text-center py-12">
+                    <div className="text-center py-12 mb-12">
                         <p className="text-slate-400">No hay dispositivos registrados</p>
                     </div>
                 )}
+
+                {/* System Section */}
+                <div className="mb-12 border-t border-slate-700 pt-12">
+                    <h2 className="text-xl font-semibold text-white mb-6">Logs del Sistema</h2>
+                    <SystemLogsViewer />
+                </div>
             </main>
         </div>
     )

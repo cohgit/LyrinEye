@@ -665,6 +665,28 @@ app.get('/api/devices/:id/stats/logs', async (req, res) => {
     }
 });
 
+app.get('/api/devices/:id/stats/telemetry', async (req, res) => {
+    try {
+        const { id: deviceId } = req.params;
+        const { start, end, granularity } = req.query;
+
+        if (!start || !end || !granularity) {
+            return res.status(400).send({ error: 'Missing required parameters: start, end, granularity' });
+        }
+
+        const stats = await LogcatService.getTelemetryStats(
+            deviceId,
+            start as string,
+            end as string,
+            granularity as '1d' | '1h' | '1m'
+        );
+        res.send(stats);
+    } catch (error: any) {
+        console.error(`[STATS] Failed to get telemetry stats:`, error);
+        res.status(500).send({ error: error.message });
+    }
+});
+
 // Query Web Logs
 app.get('/api/web/logs', async (req, res) => {
     try {

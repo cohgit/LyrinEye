@@ -6,6 +6,7 @@ import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import DeviceViews from "@/app/components/DeviceViews"
 import DeviceActions from "@/app/components/DeviceActions"
+import DeviceContent from "@/app/components/DeviceContent"
 import TimeDisplay from "@/app/components/TimeDisplay"
 import { Wifi, Radio, BatteryCharging } from "lucide-react"
 
@@ -92,53 +93,13 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Device Info */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* Metrics Cards */}
-                        {showMetrics ? (
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h3 className="text-xs text-slate-400">Batería</h3>
-                                        {device.isCharging && (
-                                            <BatteryCharging className="w-4 h-4 text-yellow-500 animate-pulse" />
-                                        )}
-                                    </div>
-                                    <div className="text-2xl font-bold text-white">{Math.round(device.battery * 100)}%</div>
-                                </div>
-
-                                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
-                                    <h3 className="text-xs text-slate-400 mb-2">CPU</h3>
-                                    <div className="text-2xl font-bold text-white">{device.cpu?.toFixed(1)}%</div>
-                                </div>
-
-                                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
-                                    <h3 className="text-xs text-slate-400 mb-2">RAM</h3>
-                                    <div className="text-lg font-bold text-white">
-                                        {device.ramUsed ? `${(device.ramUsed / 1024).toFixed(1)}GB / ` : ''}
-                                        {(device.ram / 1024).toFixed(1)} GB
-                                    </div>
-                                </div>
-
-                                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
-                                    <h3 className="text-xs text-slate-400 mb-2">Almacenamiento</h3>
-                                    <div className="text-2xl font-bold text-white">
-                                        {device.storageFree ? `${(device.storageFree / 1024).toFixed(1)} GB` : 'N/A'}
-                                    </div>
-                                    <div className="text-[10px] text-slate-500">Libre</div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-xl p-8 flex flex-col items-center justify-center text-slate-500 gap-2">
-                                <div className="p-3 bg-slate-800 rounded-full">
-                                    <Radio className="w-6 h-6 opacity-20" />
-                                </div>
-                                <p className="text-sm italic text-center">Sin telemetría reciente disponible</p>
-                                <p className="text-[10px] uppercase tracking-widest opacity-50 text-center">El dispositivo lleva más de 24h sin conexión</p>
-                            </div>
-                        )}
-
-                        {/* Views (Live / History) */}
-                        <DeviceViews deviceId={id} isLiveEnabled={showMetrics} userEmail={session?.user?.email || undefined} />
+                    {/* Device Info (Tabs: Charts | History) */}
+                    <div className="lg:col-span-2">
+                        <DeviceContent
+                            deviceId={id}
+                            device={device}
+                            userEmail={session?.user?.email || undefined}
+                        />
                     </div>
 
                     {/* Sidebar */}

@@ -477,3 +477,50 @@ export async function getLogStats(deviceId: string, start: string, end: string, 
         return [];
     }
 }
+
+export async function getTelemetryStats(deviceId: string, start: string, end: string, granularity: '1d' | '1h' | '1m') {
+    if (!WORKSPACE_ID) return [];
+
+    try {
+        // Query LyrinEye_Mobile_Telemetry_CL for aggregated stats
+        // We calculate averages for CPU, RAM, Battery, and Disk Free
+        const query = `LyrinEye_Mobile_Telemetry_CL 
+            | where column_ifexists('DeviceName', '') =~ "${deviceId}" or column_ifexists('DeviceId_s', '') == "${deviceId}" or column_ifexists('DeviceId', '') == "${deviceId}"
+            | where TimeGenerated between (datetime("${start}") .. datetime("${end}"))
+            | summarize 
+                AvgCPU = avg(todouble(column_ifexists('CPUUsage', '0'))),
+                AvgRAM = avg(todouble(column_ifexists('RamTotalMB', '0')) - todouble(column_ifexists('RamUsedMB', '0'))),
+                AvgBattery = avg(todouble(column_ifexists('BatteryLevel', '0'))),
+                AvgDisk = avg(todouble(column_ifexists('StorageFreeMB', '0')))
+              by Timestamp=bin(TimeGenerated, ${granularity})
+            | order by Timestamp asc`;
+
+        const result = await logsQueryClient.queryWorkspace(
+            WORKSPACE_ID,
+            query,
+            { duration: 'P365D' as any }
+        );
+
+        if (result.status === 'Success') {
+            const table = result.tables[0];
+            return table.rows.map(row => {
+                const entry: any = {};
+                table.columnDescriptors.forEach((col, idx) => {
+                    const colName = col.name as string;
+                    if (colName) entry[colName] = row[idx];
+                });
+                return {
+                    timestamp: entry.Timestamp,
+                    cpu: entry.AvgCPU,
+                    ramFree: entry.AvgRAM, // This is actually Total - Used if we did the calculation right, or we can just send Used
+                    battery: entry.AvgBattery,
+                    diskFree: entry.AvgDisk
+                };
+            });
+        }
+        return [];
+    } catch (error: any) {
+        console.error('[TELEMETRY] Error getting telemetry stats:', error.message);
+        return [];
+    }
+}
