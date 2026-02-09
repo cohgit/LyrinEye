@@ -301,7 +301,13 @@ export async function getLatestTelemetry(deviceId: string) {
 
     try {
         // Robust query on new Telemetry table
-        const query = `LyrinEye_Mobile_Telemetry_CL | where column_ifexists('DeviceName', '') =~ "${deviceId}" or column_ifexists('DeviceId_s', '') == "${deviceId}" or column_ifexists('DeviceId', '') == "${deviceId}" | order by TimeGenerated desc | take 1`;
+        const query = `LyrinEye_Mobile_Telemetry_CL 
+            | where column_ifexists('DeviceName_s', '') =~ "${deviceId}" 
+              or column_ifexists('DeviceName', '') =~ "${deviceId}" 
+              or column_ifexists('DeviceId_s', '') == "${deviceId}" 
+              or column_ifexists('DeviceId', '') == "${deviceId}" 
+            | order by TimeGenerated desc 
+            | take 1`;
         const result = await logsQueryClient.queryWorkspace(
             WORKSPACE_ID,
             query,
@@ -483,15 +489,27 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
 
     try {
         // Query LyrinEye_Mobile_Telemetry_CL for aggregated stats
-        // We calculate averages for CPU, RAM, Battery, and Disk Free
+        // We use extend to normalize columns and handle possible suffixes (_d, _s, etc)
         const query = `LyrinEye_Mobile_Telemetry_CL 
-            | where column_ifexists('DeviceName', '') =~ "${deviceId}" or column_ifexists('DeviceId_s', '') == "${deviceId}" or column_ifexists('DeviceId', '') == "${deviceId}"
-            | where TimeGenerated between (datetime("${start}") .. datetime("${end}"))
+            | where column_ifexists('DeviceName_s', '') =~ "${deviceId}" 
+              or column_ifexists('DeviceName', '') =~ "${deviceId}" 
+              or column_ifexists('DeviceId_s', '') == "${deviceId}" 
+              or column_ifexists('DeviceId', '') == "${deviceId}"
+            | where TimeGenerated > datetime("${start}") and TimeGenerated < datetime("${end}")
+            | extend 
+                valCPU = coalesce(todouble(column_ifexists('CPUUsage_d', null)), todouble(column_ifexists('CPUUsage_s', null)), todouble(column_ifexists('CPUUsage', null))),
+                valRamUsed = coalesce(todouble(column_ifexists('RamUsedMB_d', null)), todouble(column_ifexists('RamUsedMB_s', null)), todouble(column_ifexists('RamUsedMB', null))),
+                valRamTotal = coalesce(todouble(column_ifexists('RamTotalMB_d', null)), todouble(column_ifexists('RamTotalMB_s', null)), todouble(column_ifexists('RamTotalMB', null))),
+                valBattery = coalesce(todouble(column_ifexists('BatteryLevel_d', null)), todouble(column_ifexists('BatteryLevel_s', null)), todouble(column_ifexists('BatteryLevel', null))),
+                valDisk = coalesce(todouble(column_ifexists('StorageFreeMB_d', null)), todouble(column_ifexists('StorageFreeMB_s', null)), todouble(column_ifexists('StorageFreeMB', null)))
+            | extend 
+                perRam = iff(valRamTotal > 0, (valRamUsed / valRamTotal) * 100, todouble(null)),
+                perBattery = valBattery * (iff(valBattery <= 1.0, 100.0, 1.0)) // Auto-detect 0-1 vs 0-100
             | summarize 
-                AvgCPU = avg(todouble(column_ifexists('CPUUsage', '0'))),
-                AvgRAM = avg(todouble(column_ifexists('RamUsedMB', '0')) / iff(todouble(column_ifexists('RamTotalMB', '0')) == 0, 1.0, todouble(column_ifexists('RamTotalMB', '0'))) * 100),
-                AvgBattery = avg(todouble(column_ifexists('BatteryLevel', '0'))),
-                AvgDisk = avg(todouble(column_ifexists('StorageFreeMB', '0')))
+                AvgCPU = avg(valCPU),
+                AvgRAM = avg(perRam),
+                AvgBattery = avg(perBattery),
+                AvgDisk = avg(valDisk)
               by Timestamp=bin(TimeGenerated, ${granularity})
             | order by Timestamp asc`;
 
@@ -503,7 +521,7 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
 
         if (result.status === 'Success') {
             const table = result.tables[0];
-            return result.tables[0].rows.map(row => {
+            return table.rows.map(row => {
                 const entry: any = {};
                 table.columnDescriptors.forEach((col, idx) => {
                     const colName = col.name as string;
@@ -511,10 +529,10 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
                 });
                 return {
                     timestamp: entry.Timestamp,
-                    cpu: entry.AvgCPU,
-                    ram: entry.AvgRAM,
-                    battery: entry.AvgBattery,
-                    diskFree: entry.AvgDisk
+                    cpu: entry.AvgCPU || 0,
+                    ram: entry.AvgRAM || 0,
+                    battery: entry.AvgBattery || 0,
+                    diskFree: entry.AvgDisk || 0
                 };
             });
         }

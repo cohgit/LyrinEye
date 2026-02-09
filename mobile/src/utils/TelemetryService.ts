@@ -71,6 +71,7 @@ class TelemetryService {
                 IsCharging: powerState.batteryState === 'charging' || powerState.batteryState === 'full',
                 BatteryStatus: powerState.batteryState || 'unknown',
                 LowPowerMode: powerState.lowPowerMode ? 'Yes' : 'No',
+                Mode: 'owner', // Defaulting to owner for now, could be made configurable
                 Latitude: coords?.lat?.toFixed(6) ?? 'N/A',
                 Longitude: coords?.lon?.toFixed(6) ?? 'N/A',
                 Timestamp: new Date().toISOString()
