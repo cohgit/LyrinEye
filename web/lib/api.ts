@@ -104,3 +104,20 @@ export async function getSystemLogs(params: { table: string, query?: string, tim
         return [];
     }
 }
+
+export async function getTelemetryStats(
+    deviceId: string,
+    start: string,
+    end: string,
+    granularity: '1d' | '1h' | '1m'
+) {
+    try {
+        const response = await axios.get(`${getBaseUrl()}/api/devices/${deviceId}/stats/telemetry`, {
+            params: { start, end, granularity }
+        });
+        return response.data;
+    } catch (error) {
+        console.error(`Failed to fetch telemetry stats for ${deviceId}:`, error);
+        return [];
+    }
+}
