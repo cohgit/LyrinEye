@@ -1,4 +1,15 @@
-export { auth as middleware } from "@/auth"
+import { auth } from "@/auth"
+import { NextResponse } from "next/server"
+
+export default auth((req) => {
+    const isLoggedIn = !!req.auth;
+    const isDashboard = req.nextUrl.pathname.startsWith('/dashboard') || req.nextUrl.pathname.startsWith('/devices');
+
+    if (isDashboard && !isLoggedIn) {
+        return NextResponse.redirect(new URL("/", req.nextUrl));
+    }
+    return NextResponse.next();
+})
 
 export const config = {
     matcher: ['/dashboard/:path*', '/devices/:path*'],
