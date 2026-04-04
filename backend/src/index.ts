@@ -178,8 +178,8 @@ app.get('/sas', async (req, res) => {
 
         // Extract account name and key from connection string
         const parts = CONNECTION_STRING.split(';');
-        const accountName = parts.find(p => p.startsWith('AccountName='))?.split('=')[1] || '';
-        const accountKey = parts.find(p => p.startsWith('AccountKey='))?.split('=')[1] || '';
+        const accountName = parts.find(p => p.startsWith('AccountName='))?.replace('AccountName=', '') || '';
+        const accountKey = parts.find(p => p.startsWith('AccountKey='))?.replace('AccountKey=', '') || '';
 
         const sasToken = generateBlobSASQueryParameters({
             containerName,
@@ -319,8 +319,8 @@ app.get('/api/recordings', async (req, res) => {
         }
 
         const parts = CONNECTION_STRING.split(';');
-        const accountName = parts.find(p => p.startsWith('AccountName='))?.split('=')[1] || '';
-        const accountKey = parts.find(p => p.startsWith('AccountKey='))?.split('=')[1] || '';
+        const accountName = parts.find(p => p.startsWith('AccountName='))?.replace('AccountName=', '') || '';
+        const accountKey = parts.find(p => p.startsWith('AccountKey='))?.replace('AccountKey=', '') || '';
         const credential = new StorageSharedKeyCredential(accountName, accountKey);
         const containerName = 'recordings';
 
