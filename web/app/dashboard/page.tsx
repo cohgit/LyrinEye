@@ -1,20 +1,42 @@
 import { auth, signOut } from "@/auth"
 import { getDevices } from "@/lib/api"
 import Link from "next/link"
-import { format, formatDistanceToNow } from "date-fns"
+import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import SystemLogsViewer from "@/app/components/SystemLogsViewer"
+
+function toNum(v: unknown, fallback = 0): number {
+    const n = typeof v === 'number' ? v : Number(v)
+    return Number.isFinite(n) ? n : fallback
+}
+
+function modeLabel(mode: unknown): string | null {
+    if (mode == null || mode === '') return null
+    const s = typeof mode === 'string' ? mode : String(mode)
+    if (!s.length) return null
+    return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+function formatErrorForUi(e: unknown): string {
+    if (e instanceof Error) return e.message || String(e)
+    if (typeof e === 'string') return e
+    try {
+        return JSON.stringify(e)
+    } catch {
+        return String(e)
+    }
+}
 
 export default async function DashboardPage() {
     let session = null;
     let devices: any[] = [];
-    let errorMsg = null;
+    let errorMsg: string | null = null;
 
     try {
         session = await auth()
         devices = await getDevices(session?.user?.email || undefined)
-    } catch (e: any) {
-        errorMsg = (e.message || "Fallo en la resolución del Dashboard") + " - " + JSON.stringify(e);
+    } catch (e: unknown) {
+        errorMsg = formatErrorForUi(e)
         console.error("Dashboard Render Error:", e);
     }
 
@@ -70,12 +92,18 @@ export default async function DashboardPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-                    {devices.map((device) => {
-                        let lastSeenDate = new Date(device.lastSeen);
+                    {devices.map((device, idx) => {
+                        const battery = toNum(device?.battery, NaN)
+                        const cpu = toNum(device?.cpu, 0)
+                        const ram = toNum(device?.ram, 0)
+                        const hasBattery = Number.isFinite(battery)
+                        const modeStr = modeLabel(device?.mode)
+
+                        let lastSeenDate = new Date(device?.lastSeen);
                         if (isNaN(lastSeenDate.getTime())) {
                             lastSeenDate = new Date(0); // Fallback to epoch if invalid
                         }
-                        
+
                         const diffMs = Date.now() - lastSeenDate.getTime();
                         const diffMin = diffMs / (1000 * 60);
                         const diffDay = diffMs / (1000 * 60 * 60 * 24);
@@ -84,8 +112,7 @@ export default async function DashboardPage() {
                         let statusColor = 'bg-red-500/20 text-red-400';
                         let showMetrics = true;
 
-                        // Robust checks for status
-                        if (!device.lastSeen) {
+                        if (!device?.lastSeen) {
                             statusLabel = 'Desconocido';
                             statusColor = 'bg-slate-500/20 text-slate-400';
                             showMetrics = false;
@@ -103,8 +130,8 @@ export default async function DashboardPage() {
 
                         return (
                             <Link
-                                key={device.id}
-                                href={`/devices/${device.id}`}
+                                key={device?.id != null && device.id !== '' ? String(device.id) : `device-${idx}`}
+                                href={`/devices/${encodeURIComponent(String(device?.id ?? ''))}`}
                                 className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-6 hover:border-slate-600 transition-all duration-200 hover:scale-[1.02] flex flex-col gap-4"
                             >
                                 {/* Status Badge */}
@@ -113,18 +140,18 @@ export default async function DashboardPage() {
                                         <img src="/app-icon.png" alt="Device Icon" className="w-10 h-10 rounded-lg shadow-sm" />
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="text-lg font-semibold text-white line-clamp-1">{device.name || 'Dispositivo sin nombre'}</h3>
-                                        <p className="text-slate-500 text-xs font-normal">({device.id})</p>
-                                        {device.appVersion && (
-                                            <p className="text-[10px] text-slate-400 mt-0.5">{device.appVersion}</p>
+                                        <h3 className="text-lg font-semibold text-white line-clamp-1">{device?.name || 'Dispositivo sin nombre'}</h3>
+                                        <p className="text-slate-500 text-xs font-normal">({String(device?.id ?? '')})</p>
+                                        {device?.appVersion && (
+                                            <p className="text-[10px] text-slate-400 mt-0.5">{String(device.appVersion)}</p>
                                         )}
                                         <div className="flex gap-2.5 mt-2">
                                             <span className={`px-3 py-0.5 rounded-full text-[10px] font-medium ${statusColor}`}>
                                                 {statusLabel}
                                             </span>
-                                            {device.mode && (
+                                            {modeStr && (
                                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                                                    {device.mode.charAt(0).toUpperCase() + device.mode.slice(1)}
+                                                    {modeStr}
                                                 </span>
                                             )}
                                         </div>
@@ -132,36 +159,36 @@ export default async function DashboardPage() {
                                 </div>
 
                                 {/* Metrics */}
-                                {showMetrics && device.battery !== undefined ? (
+                                {showMetrics && hasBattery ? (
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-slate-400">Batería</span>
                                             <div className="flex items-center gap-2">
                                                 <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
                                                     <div
-                                                        className={`h-full ${device.battery > 0.5
+                                                        className={`h-full ${battery > 0.5
                                                             ? 'bg-green-500'
-                                                            : device.battery > 0.2
+                                                            : battery > 0.2
                                                                 ? 'bg-yellow-500'
                                                                 : 'bg-red-500'
                                                             }`}
-                                                        style={{ width: `${(device.battery || 0) * 100}%` }}
+                                                        style={{ width: `${Math.min(100, Math.max(0, battery * 100))}%` }}
                                                     />
                                                 </div>
                                                 <span className="text-sm text-white w-12 text-right">
-                                                    {Math.round((device.battery || 0) * 100)}%
+                                                    {Math.round(battery * 100)}%
                                                 </span>
                                             </div>
                                         </div>
 
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-slate-400">CPU</span>
-                                            <span className="text-sm text-white">{(device.cpu || 0).toFixed(1)}%</span>
+                                            <span className="text-sm text-white">{cpu.toFixed(1)}%</span>
                                         </div>
 
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-slate-400">RAM</span>
-                                            <span className="text-sm text-white">{Math.round(device.ram || 0)} MB</span>
+                                            <span className="text-sm text-white">{Math.round(ram)} MB</span>
                                         </div>
                                     </div>
                                 ) : (
@@ -174,7 +201,7 @@ export default async function DashboardPage() {
                                 <div className="mt-4 pt-4 border-t border-slate-700/50">
                                     <p className="text-xs text-slate-400">
                                         Última actividad:{' '}
-                                        {device.lastSeen ? (
+                                        {device?.lastSeen ? (
                                             format(lastSeenDate, "d 'de' MMM, HH:mm:ss", {
                                                 locale: es,
                                             })
