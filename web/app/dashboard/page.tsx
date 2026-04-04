@@ -6,8 +6,29 @@ import { es } from "date-fns/locale"
 import SystemLogsViewer from "@/app/components/SystemLogsViewer"
 
 export default async function DashboardPage() {
-    const session = await auth()
-    const devices = await getDevices(session?.user?.email || undefined)
+    let session = null;
+    let devices: any[] = [];
+    let errorMsg = null;
+
+    try {
+        session = await auth()
+        devices = await getDevices(session?.user?.email || undefined)
+    } catch (e: any) {
+        errorMsg = e.message || "Fallo en la resolución del Dashboard";
+        console.error("Dashboard Render Error:", e);
+    }
+
+    if (errorMsg) {
+        return (
+            <div className="p-10 bg-red-950 text-red-200 min-h-screen">
+                <h1 className="text-2xl font-bold mb-4">Error de Servidor (Dashboard)</h1>
+                <p className="bg-black/50 p-4 rounded-lg font-mono">{errorMsg}</p>
+                <div className="mt-4 text-xs opacity-50">
+                    Verifica que las variables de entorno AUTH_SECRET y BACKEND_API_URL sean correctas.
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
