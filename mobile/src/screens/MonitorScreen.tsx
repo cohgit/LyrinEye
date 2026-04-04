@@ -23,7 +23,7 @@ const configuration = {
     ],
 };
 
-const MonitorScreen = ({ navigation }: any) => {
+const MonitorScreen = ({ navigation, route }: any) => {
     // Modes: 'idle' (nothing), 'recording' (VisionCamera + Upload), 'streaming' (WebRTC Loop)
     const [mode, setMode] = useState<'idle' | 'recording' | 'streaming'>('idle');
     const [localStreamUrl, setLocalStreamUrl] = useState<string | null>(null);
@@ -155,6 +155,15 @@ const MonitorScreen = ({ navigation }: any) => {
             ScreenBrightness.setBrightness(initialBrightness.current);
         };
     }, []);
+
+    // ADB / deep link: lyrineye://adb/record — inicia grabación sin pulsar INICIAR
+    useEffect(() => {
+        if (!route.params?.adbAutoRecord) return;
+        navigation.setParams({ adbAutoRecord: undefined });
+        AzureLogger.log('ADB auto-start recording');
+        setMode('recording');
+        KeepAwake.activate();
+    }, [route.params?.adbAutoRecord, navigation]);
 
     const resetInactivityTimer = useCallback(() => {
         if (inactivityTimer.current) clearTimeout(inactivityTimer.current);

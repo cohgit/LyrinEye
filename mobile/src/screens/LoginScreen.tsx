@@ -1,19 +1,30 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Image, Linking } from 'react-native';
 import { authService } from '../utils/AuthService';
 import { AzureLogger } from '../utils/AzureLogger';
+import { isAdbRecordDeepLink } from '../utils/adbDeepLink';
 
 const LoginScreen = ({ navigation }: any) => {
     const [loading, setLoading] = useState(false);
 
     React.useEffect(() => {
-        const checkUser = async () => {
+        let cancelled = false;
+        (async () => {
+            const initialUrl = await Linking.getInitialURL();
+            const adbRecord = isAdbRecordDeepLink(initialUrl);
             const user = await authService.getCurrentUser();
+            if (cancelled) return;
             if (user) {
-                navigation.replace('Home');
+                if (adbRecord) {
+                    navigation.replace('Monitor', { adbAutoRecord: true });
+                } else {
+                    navigation.replace('Home');
+                }
             }
+        })();
+        return () => {
+            cancelled = true;
         };
-        checkUser();
     }, []);
 
     const handleLogin = async () => {
