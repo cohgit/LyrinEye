@@ -1,6 +1,6 @@
 import { auth } from "@/auth"
 import { getDeviceDetails } from "@/lib/api"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
@@ -10,8 +10,15 @@ import DeviceContent from "@/app/components/DeviceContent"
 import TimeDisplay from "@/app/components/TimeDisplay"
 import { Wifi, Radio, BatteryCharging } from "lucide-react"
 
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+export const runtime = "nodejs"
+
 export default async function DevicePage({ params }: { params: Promise<{ id: string }> }) {
     const session = await auth()
+    if (!session?.user?.email) {
+        redirect("/")
+    }
     const { id } = await params
 
     const device = await getDeviceDetails(id)

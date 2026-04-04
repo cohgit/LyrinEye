@@ -4,6 +4,11 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import SystemLogsViewer from "@/app/components/SystemLogsViewer"
+import { redirect } from "next/navigation"
+
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+export const runtime = "nodejs"
 
 function toNum(v: unknown, fallback = 0): number {
     const n = typeof v === 'number' ? v : Number(v)
@@ -28,13 +33,17 @@ function formatErrorForUi(e: unknown): string {
 }
 
 export default async function DashboardPage() {
-    let session = null;
+    const session = await auth()
+    const email = session?.user?.email
+    if (!email) {
+        redirect("/")
+    }
+
     let devices: any[] = [];
     let errorMsg: string | null = null;
 
     try {
-        session = await auth()
-        devices = await getDevices(session?.user?.email || undefined)
+        devices = await getDevices(email)
     } catch (e: unknown) {
         errorMsg = formatErrorForUi(e)
         console.error("Dashboard Render Error:", e);
@@ -228,5 +237,3 @@ export default async function DashboardPage() {
         </div>
     )
 }
-
-// Force refresh git tracking
