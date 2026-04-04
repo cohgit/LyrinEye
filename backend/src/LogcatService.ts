@@ -488,23 +488,25 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
     if (!WORKSPACE_ID) return [];
 
     try {
-        // Query LyrinEye_Mobile_Telemetry_CL for aggregated stats
-        // We use extend to normalize columns and handle possible suffixes (_d, _s, etc)
+        const safeStart = new Date(start).toISOString();
+        const safeEnd = new Date(end).toISOString();
+
+        // Most telemetry fields are ingested as strings (_s). Parse safely and aggregate.
         const query = `LyrinEye_Mobile_Telemetry_CL 
             | where column_ifexists('DeviceName_s', '') =~ "${deviceId}" 
               or column_ifexists('DeviceName', '') =~ "${deviceId}" 
               or column_ifexists('DeviceId_s', '') == "${deviceId}" 
               or column_ifexists('DeviceId', '') == "${deviceId}"
-            | where TimeGenerated > datetime("${start}") and TimeGenerated < datetime("${end}")
+            | where TimeGenerated between (datetime("${safeStart}") .. datetime("${safeEnd}"))
             | extend 
-                valCPU = coalesce(todouble(column_ifexists('CPUUsage_d', null)), todouble(column_ifexists('CPUUsage_s', null)), todouble(column_ifexists('CPUUsage', null))),
-                valRamUsed = coalesce(todouble(column_ifexists('RamUsedMB_d', null)), todouble(column_ifexists('RamUsedMB_s', null)), todouble(column_ifexists('RamUsedMB', null))),
-                valRamTotal = coalesce(todouble(column_ifexists('RamTotalMB_d', null)), todouble(column_ifexists('RamTotalMB_s', null)), todouble(column_ifexists('RamTotalMB', null))),
-                valBattery = coalesce(todouble(column_ifexists('BatteryLevel_d', null)), todouble(column_ifexists('BatteryLevel_s', null)), todouble(column_ifexists('BatteryLevel', null))),
-                valDisk = coalesce(todouble(column_ifexists('StorageFreeMB_d', null)), todouble(column_ifexists('StorageFreeMB_s', null)), todouble(column_ifexists('StorageFreeMB', null)))
+                valCPU = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, tostring(coalesce(column_ifexists('CPUUsage_s', ''), column_ifexists('CPUUsage', ''))))),
+                valRamUsed = todouble(coalesce(column_ifexists('RamUsedMB_s', ''), column_ifexists('RamUsedMB_d', ''), column_ifexists('RamUsedMB', ''))),
+                valRamTotal = todouble(coalesce(column_ifexists('RamTotalMB_s', ''), column_ifexists('RamTotalMB_d', ''), column_ifexists('RamTotalMB', ''))),
+                valBattery = todouble(coalesce(column_ifexists('BatteryLevel_s', ''), column_ifexists('BatteryLevel_d', ''), column_ifexists('BatteryLevel', ''))),
+                valDisk = todouble(coalesce(column_ifexists('StorageFreeMB_s', ''), column_ifexists('StorageFreeMB_d', ''), column_ifexists('StorageFreeMB', '')))
             | extend 
-                perRam = iff(valRamTotal > 0, (valRamUsed / valRamTotal) * 100, todouble(null)),
-                perBattery = valBattery * (iff(valBattery <= 1.0, 100.0, 1.0)) // Auto-detect 0-1 vs 0-100
+                perRam = iff(isnotnull(valRamTotal) and valRamTotal > 0.0 and isnotnull(valRamUsed), (valRamUsed / valRamTotal) * 100.0, real(null)),
+                perBattery = iff(isnull(valBattery), real(null), iff(valBattery <= 1.0, valBattery * 100.0, valBattery))
             | summarize 
                 AvgCPU = avg(valCPU),
                 AvgRAM = avg(perRam),
@@ -529,10 +531,10 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
                 });
                 return {
                     timestamp: entry.Timestamp,
-                    cpu: entry.AvgCPU || 0,
-                    ram: entry.AvgRAM || 0,
-                    battery: entry.AvgBattery || 0,
-                    diskFree: entry.AvgDisk || 0
+                    cpu: Number.isFinite(Number(entry.AvgCPU)) ? Number(entry.AvgCPU) : 0,
+                    ram: Number.isFinite(Number(entry.AvgRAM)) ? Number(entry.AvgRAM) : 0,
+                    battery: Number.isFinite(Number(entry.AvgBattery)) ? Number(entry.AvgBattery) : 0,
+                    diskFree: Number.isFinite(Number(entry.AvgDisk)) ? Number(entry.AvgDisk) : 0
                 };
             });
         }
