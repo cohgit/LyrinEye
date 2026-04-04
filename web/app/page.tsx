@@ -2,22 +2,10 @@ import { auth, signIn } from "@/auth"
 import { redirect } from "next/navigation"
 
 export default async function Home() {
-  let session = null;
-  let errorMsg = null;
-  
-  try {
-    session = await auth()
-  } catch (e: any) {
-    errorMsg = e.message || "Error al inicializar sesión";
-    console.error("Auth Error:", e);
-  }
+  const session = await auth()
 
   if (session?.user) {
     redirect('/dashboard')
-  }
-
-  if (errorMsg) {
-    return <div className="p-10 text-red-500 bg-black min-h-screen">Error de Servidor: {errorMsg}</div>
   }
 
   return (
