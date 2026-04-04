@@ -32,6 +32,33 @@ const deviceTokensClient = TableClient.fromConnectionString(CONNECTION_STRING, '
 // Firebase and Logcat Services
 import { initializeFirebase, sendPushNotification } from './FirebaseService';
 import * as LogcatService from './LogcatService';
+import { canonicalIdentityEmail, escapeODataString, identityEmailPartitionKeysForQuery } from './emailIdentity';
+
+async function listUserDeviceEntitiesMerged(email: string) {
+    const partitionKeys = identityEmailPartitionKeysForQuery(email);
+    const byRowKey = new Map<string, Record<string, unknown>>();
+    for (const pk of partitionKeys) {
+        const filter = `PartitionKey eq '${escapeODataString(pk)}'`;
+        const entities = userDevicesClient.listEntities({ queryOptions: { filter } });
+        for await (const entity of entities) {
+            const id = entity.rowKey as string;
+            if (!byRowKey.has(id)) byRowKey.set(id, entity as Record<string, unknown>);
+        }
+    }
+    return Array.from(byRowKey.values());
+}
+
+async function userOwnsDeviceRow(email: string, roomId: string): Promise<boolean> {
+    for (const pk of identityEmailPartitionKeysForQuery(email)) {
+        try {
+            await userDevicesClient.getEntity(pk, roomId);
+            return true;
+        } catch {
+            /* 404 */
+        }
+    }
+    return false;
+}
 
 // Ensure resources exist
 async function initStorage() {
@@ -75,10 +102,10 @@ io.on('connection', (socket: Socket) => {
 
             // Check authorization in UserDevices table
             const normalizedEmail = email.toLowerCase();
-            try {
-                const entity = await userDevicesClient.getEntity(normalizedEmail, roomId);
+            const allowed = await userOwnsDeviceRow(normalizedEmail, roomId);
+            if (allowed) {
                 console.log(`[AUTH] Access GRANTED for ${normalizedEmail} to device ${roomId}`);
-            } catch (e) {
+            } else {
                 console.log(`[AUTH-DENIED] Unauthorized access attempt by ${normalizedEmail} to device ${roomId}`);
                 return socket.emit('error', 'Unauthorized access');
             }
@@ -248,10 +275,10 @@ app.post('/register-device', async (req, res) => {
         const { deviceId, email, wifiSSID, appVersion, androidVersion } = req.body;
         if (!deviceId || !email) return res.status(400).send({ error: 'deviceId and email are required' });
 
-        const normalizedEmail = email.toLowerCase();
-        console.log(`[REG] Registering device ${deviceId} for user ${normalizedEmail}`);
+        const partitionKey = canonicalIdentityEmail(email);
+        console.log(`[REG] Registering device ${deviceId} for user ${partitionKey} (raw: ${email.toLowerCase()})`);
         await userDevicesClient.upsertEntity({
-            partitionKey: normalizedEmail,
+            partitionKey,
             rowKey: deviceId,
             registeredAt: new Date().toISOString(),
             wifiSSID: wifiSSID || null,
@@ -259,7 +286,7 @@ app.post('/register-device', async (req, res) => {
             androidVersion: androidVersion || null
         });
 
-        res.send({ status: 'registered', deviceId, email: normalizedEmail });
+        res.send({ status: 'registered', deviceId, email: partitionKey });
     } catch (error: any) {
         res.status(500).send({ error: error.message });
     }
@@ -269,8 +296,8 @@ app.post('/register-device', async (req, res) => {
 app.post('/share-device', async (req, res) => {
     try {
         const { deviceId, ownerEmail, shareWithEmail } = req.body;
-        const normalizedOwnerEmail = ownerEmail.toLowerCase();
-        const normalizedShareWithEmail = shareWithEmail.toLowerCase();
+        const normalizedOwnerEmail = canonicalIdentityEmail(ownerEmail);
+        const normalizedShareWithEmail = canonicalIdentityEmail(shareWithEmail);
 
         await userDevicesClient.upsertEntity({
             partitionKey: normalizedShareWithEmail,
@@ -299,10 +326,8 @@ app.get('/api/recordings', async (req, res) => {
         if (email) {
             const normalizedEmail = email.toLowerCase();
             console.log(`[QUERY] Fetching recordings for user email: ${normalizedEmail}`);
-            const deviceEntities = userDevicesClient.listEntities({
-                queryOptions: { filter: `PartitionKey eq '${normalizedEmail}'` }
-            });
-            for await (const dev of deviceEntities) {
+            const mergedDevices = await listUserDeviceEntitiesMerged(normalizedEmail);
+            for (const dev of mergedDevices) {
                 deviceIds.push(dev.rowKey as string);
             }
 
@@ -417,16 +442,8 @@ app.get('/api/devices', async (req, res) => {
         const normalizedEmail = email.toLowerCase();
         console.log(`[DEVICES] Fetching devices for user: ${normalizedEmail}`);
 
-        const deviceEntities = [];
-        const deviceIds = [];
-        const entities = userDevicesClient.listEntities({
-            queryOptions: { filter: `PartitionKey eq '${normalizedEmail}'` }
-        });
-
-        for await (const entity of entities) {
-            deviceEntities.push(entity);
-            deviceIds.push(entity.rowKey as string);
-        }
+        const deviceEntities = await listUserDeviceEntitiesMerged(normalizedEmail);
+        const deviceIds = deviceEntities.map(e => e.rowKey as string);
 
         const telemetries = await LogcatService.getLatestTelemetries(deviceIds);
 
