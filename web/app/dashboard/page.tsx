@@ -48,7 +48,11 @@ export default async function DashboardPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
                     {devices.map((device) => {
-                        const lastSeenDate = new Date(device.lastSeen);
+                        let lastSeenDate = new Date(device.lastSeen);
+                        if (isNaN(lastSeenDate.getTime())) {
+                            lastSeenDate = new Date(0); // Fallback to epoch if invalid
+                        }
+                        
                         const diffMs = Date.now() - lastSeenDate.getTime();
                         const diffMin = diffMs / (1000 * 60);
                         const diffDay = diffMs / (1000 * 60 * 60 * 24);
@@ -57,11 +61,16 @@ export default async function DashboardPage() {
                         let statusColor = 'bg-red-500/20 text-red-400';
                         let showMetrics = true;
 
-                        if (diffMin < 1) {
+                        // Robust checks for status
+                        if (!device.lastSeen) {
+                            statusLabel = 'Desconocido';
+                            statusColor = 'bg-slate-500/20 text-slate-400';
+                            showMetrics = false;
+                        } else if (diffMin < 2) {
                             statusLabel = 'En línea';
                             statusColor = 'bg-green-500/20 text-green-400';
                         } else if (diffDay < 1) {
-                            statusLabel = 'Inactivo';
+                            statusLabel = 'Reciente';
                             statusColor = 'bg-yellow-500/20 text-yellow-400';
                         } else {
                             statusLabel = 'Desconectado';
@@ -77,9 +86,11 @@ export default async function DashboardPage() {
                             >
                                 {/* Status Badge */}
                                 <div className="flex items-start gap-4">
-                                    <img src="/app-icon.png" alt="Device Icon" className="w-12 h-12 rounded-xl border border-slate-700/50" />
+                                    <div className="bg-slate-700 p-2 rounded-xl">
+                                        <img src="/app-icon.png" alt="Device Icon" className="w-10 h-10 rounded-lg shadow-sm" />
+                                    </div>
                                     <div className="flex-1">
-                                        <h3 className="text-lg font-semibold text-white line-clamp-1">{device.name}</h3>
+                                        <h3 className="text-lg font-semibold text-white line-clamp-1">{device.name || 'Dispositivo sin nombre'}</h3>
                                         <p className="text-slate-500 text-xs font-normal">({device.id})</p>
                                         {device.appVersion && (
                                             <p className="text-[10px] text-slate-400 mt-0.5">{device.appVersion}</p>
@@ -98,7 +109,7 @@ export default async function DashboardPage() {
                                 </div>
 
                                 {/* Metrics */}
-                                {showMetrics ? (
+                                {showMetrics && device.battery !== undefined ? (
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-slate-400">Batería</span>
@@ -111,38 +122,40 @@ export default async function DashboardPage() {
                                                                 ? 'bg-yellow-500'
                                                                 : 'bg-red-500'
                                                             }`}
-                                                        style={{ width: `${device.battery * 100}%` }}
+                                                        style={{ width: `${(device.battery || 0) * 100}%` }}
                                                     />
                                                 </div>
                                                 <span className="text-sm text-white w-12 text-right">
-                                                    {Math.round(device.battery * 100)}%
+                                                    {Math.round((device.battery || 0) * 100)}%
                                                 </span>
                                             </div>
                                         </div>
 
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-slate-400">CPU</span>
-                                            <span className="text-sm text-white">{device.cpu?.toFixed(1)}%</span>
+                                            <span className="text-sm text-white">{(device.cpu || 0).toFixed(1)}%</span>
                                         </div>
 
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-slate-400">RAM</span>
-                                            <span className="text-sm text-white">{device.ram?.toFixed(0)} MB</span>
+                                            <span className="text-sm text-white">{Math.round(device.ram || 0)} MB</span>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="flex flex-col items-center justify-center py-6 text-slate-500 italic text-xs">
-                                        <p>Sin datos recientes</p>
+                                    <div className="flex flex-col items-center justify-center py-6 text-slate-500 italic text-xs border border-slate-700/30 rounded-xl bg-slate-900/20">
+                                        <p>Telemetría no disponible</p>
                                     </div>
                                 )}
 
                                 {/* Last Seen */}
-                                <div className="mt-4 pt-4 border-t border-slate-700">
+                                <div className="mt-4 pt-4 border-t border-slate-700/50">
                                     <p className="text-xs text-slate-400">
                                         Última actividad:{' '}
-                                        {format(lastSeenDate, "d 'de' MMM, HH:mm:ss", {
-                                            locale: es,
-                                        })}
+                                        {device.lastSeen ? (
+                                            format(lastSeenDate, "d 'de' MMM, HH:mm:ss", {
+                                                locale: es,
+                                            })
+                                        ) : 'Nunca'}
                                     </p>
                                 </div>
                             </Link>
