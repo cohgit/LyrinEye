@@ -29,6 +29,11 @@ export default async function DashboardPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+            {/* DIAGNOSTIC BANNER */}
+            <div className="bg-red-600 text-white p-2 text-center text-xs font-bold font-mono">
+                Usuario Actual: [{session?.user?.email || "ANÓNIMO"}] | Dispositivos Encontrados: {devices.length}
+            </div>
+
             {/* Header */}
             <header className="border-b border-slate-700 bg-slate-800/50 backdrop-blur-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
