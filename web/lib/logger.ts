@@ -33,6 +33,15 @@ class AzureLogger {
         this.overrideConsole();
         this.interceptNetwork();
 
+        // Capture Global Errors (APM)
+        window.onerror = (message, source, lineno, colno, error) => {
+            this.capture('error', [`[UNCAUGHT-ERROR] ${String(message)} at ${source}:${lineno}:${colno} Stack: ${error?.stack}`]);
+        };
+
+        window.onunhandledrejection = (event) => {
+            this.capture('error', [`[UNHANDLED-REJECTION] Reason: ${String(event.reason)}`]);
+        };
+
         // Flush regularly
         setInterval(() => this.flush(), FLUSH_INTERVAL);
 
@@ -42,7 +51,7 @@ class AzureLogger {
             if (document.visibilityState === 'hidden') this.flush();
         });
 
-        this.info('Azure Logger initialized');
+        this.info('Azure Logger (APM) initialized');
     }
 
     private interceptNetwork() {
