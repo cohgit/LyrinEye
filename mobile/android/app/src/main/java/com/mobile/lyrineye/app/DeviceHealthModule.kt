@@ -13,6 +13,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.bridge.WritableMap
+import java.io.File
 
 class DeviceHealthModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
@@ -76,11 +77,47 @@ class DeviceHealthModule(private val reactContext: ReactApplicationContext) :
     }
   }
 
+  private data class CpuSample(val total: Long, val idle: Long)
+
+  private fun readCpuSample(): CpuSample? {
+    return try {
+      val firstLine = File("/proc/stat").useLines { lines ->
+        lines.firstOrNull { it.startsWith("cpu ") }
+      } ?: return null
+
+      val parts = firstLine.trim().split(Regex("\\s+")).drop(1)
+      if (parts.size < 4) return null
+
+      val values = parts.mapNotNull { it.toLongOrNull() }
+      if (values.size < 4) return null
+
+      val idle = values[3] + (values.getOrNull(4) ?: 0L) // idle + iowait
+      val total = values.sum()
+      CpuSample(total = total, idle = idle)
+    } catch (_: Exception) {
+      null
+    }
+  }
+
+  private fun cpuUsagePercent(): Double? {
+    val start = readCpuSample() ?: return null
+    Thread.sleep(300)
+    val end = readCpuSample() ?: return null
+
+    val totalDelta = end.total - start.total
+    val idleDelta = end.idle - start.idle
+    if (totalDelta <= 0) return null
+
+    val usage = ((totalDelta - idleDelta).toDouble() / totalDelta.toDouble()) * 100.0
+    return if (usage.isFinite()) usage.coerceIn(0.0, 100.0) else null
+  }
+
   @ReactMethod
   fun getHealthSnapshot(promise: Promise) {
     try {
       val code = thermalStatusCode()
       val batteryTemp = batteryTemperatureC()
+      val cpuUsage = cpuUsagePercent()
       val snapshot: WritableMap = Arguments.createMap().apply {
         putInt("thermalStatusCode", code)
         putString("thermalStatus", thermalStatusLabel(code))
@@ -94,6 +131,11 @@ class DeviceHealthModule(private val reactContext: ReactApplicationContext) :
           putDouble("thermalHeadroom", headroom)
         } else {
           putNull("thermalHeadroom")
+        }
+        if (cpuUsage != null) {
+          putDouble("cpuUsagePercent", cpuUsage)
+        } else {
+          putNull("cpuUsagePercent")
         }
         putBoolean("powerSaveMode", isPowerSaveMode())
         putBoolean("deviceIdleMode", isDeviceIdleMode())

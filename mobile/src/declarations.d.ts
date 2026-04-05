@@ -7,6 +7,8 @@ declare module 'react-native' {
         batteryTempC: number | null
         thermalStatus: string
         thermalStatusCode: number
+        thermalHeadroom: number | null
+        cpuUsagePercent: number | null
         powerSaveMode: boolean
         deviceIdleMode: boolean
         ignoringBatteryOptimizations: boolean

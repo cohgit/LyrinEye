@@ -11,6 +11,7 @@ type ThermalInfo = {
     thermalStatus: string;
     thermalStatusCode: number;
     thermalHeadroom: number | null;
+    cpuUsagePercent: number | null;
     powerSaveMode: boolean;
     deviceIdleMode: boolean;
     ignoringBatteryOptimizations: boolean;
@@ -66,9 +67,10 @@ class TelemetryService {
             const freeDisk = await RNFS.getFSInfo().then(info => info.freeSpace).catch(() => -1);
             const totalMemory = await DeviceInfo.getTotalMemory();
             const usedMemory = await DeviceInfo.getUsedMemory();
+            const thermal = await this.getThermalInfo();
 
-            // Real-time CPU Usage calculation for Android
-            const cpuUsage = await this.getCPUUsage();
+            // CPU usage: prefer Android native snapshot (more reliable), fallback to proc/stat.
+            const cpuUsage = await this.getCpuUsage(thermal);
 
             // Device Metrics
             const powerState = await DeviceInfo.getPowerState();
@@ -76,7 +78,6 @@ class TelemetryService {
 
             // Geolocation
             const coords = await this.getCoordinates();
-            const thermal = await this.getThermalInfo();
 
             const telemetryData = {
                 BatteryLevel: batteryLevel.toFixed(4),
@@ -116,6 +117,7 @@ class TelemetryService {
                 thermalStatus: 'unsupported',
                 thermalStatusCode: -1,
                 thermalHeadroom: null,
+                cpuUsagePercent: null,
                 powerSaveMode: false,
                 deviceIdleMode: false,
                 ignoringBatteryOptimizations: false,
@@ -128,6 +130,7 @@ class TelemetryService {
                 thermalStatus: info?.thermalStatus || 'unknown',
                 thermalStatusCode: typeof info?.thermalStatusCode === 'number' ? info.thermalStatusCode : -1,
                 thermalHeadroom: typeof info?.thermalHeadroom === 'number' ? info.thermalHeadroom : null,
+                cpuUsagePercent: typeof info?.cpuUsagePercent === 'number' ? info.cpuUsagePercent : null,
                 powerSaveMode: info?.powerSaveMode === true,
                 deviceIdleMode: info?.deviceIdleMode === true,
                 ignoringBatteryOptimizations: info?.ignoringBatteryOptimizations === true,
@@ -138,11 +141,19 @@ class TelemetryService {
                 thermalStatus: 'error',
                 thermalStatusCode: -1,
                 thermalHeadroom: null,
+                cpuUsagePercent: null,
                 powerSaveMode: false,
                 deviceIdleMode: false,
                 ignoringBatteryOptimizations: false,
             };
         }
+    }
+
+    private async getCpuUsage(thermal: ThermalInfo): Promise<string> {
+        if (typeof thermal.cpuUsagePercent === 'number' && Number.isFinite(thermal.cpuUsagePercent)) {
+            return thermal.cpuUsagePercent.toFixed(2);
+        }
+        return this.getCPUUsage();
     }
 
     private async getCPUUsage(): Promise<string> {
