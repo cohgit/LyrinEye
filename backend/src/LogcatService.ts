@@ -491,22 +491,32 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
         const safeStart = new Date(start).toISOString();
         const safeEnd = new Date(end).toISOString();
 
-        // Most telemetry fields are ingested as strings (_s). Parse safely and aggregate.
+        // Most telemetry fields are ingested as strings (_s). Normalize to strings first,
+        // then extract numeric payload to avoid KQL type-mismatch edge cases.
         const query = `LyrinEye_Mobile_Telemetry_CL 
             | where column_ifexists('DeviceName_s', '') =~ "${deviceId}" 
               or column_ifexists('DeviceName', '') =~ "${deviceId}" 
               or column_ifexists('DeviceId_s', '') == "${deviceId}" 
               or column_ifexists('DeviceId', '') == "${deviceId}"
             | where TimeGenerated between (datetime("${safeStart}") .. datetime("${safeEnd}"))
-            | extend 
-                valCPU = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, tostring(coalesce(column_ifexists('CPUUsage_s', ''), column_ifexists('CPUUsage', ''))))),
-                valRamUsed = todouble(coalesce(column_ifexists('RamUsedMB_s', ''), column_ifexists('RamUsedMB_d', ''), column_ifexists('RamUsedMB', ''))),
-                valRamTotal = todouble(coalesce(column_ifexists('RamTotalMB_s', ''), column_ifexists('RamTotalMB_d', ''), column_ifexists('RamTotalMB', ''))),
-                valBattery = todouble(coalesce(column_ifexists('BatteryLevel_s', ''), column_ifexists('BatteryLevel_d', ''), column_ifexists('BatteryLevel', ''))),
-                valDisk = todouble(coalesce(column_ifexists('StorageFreeMB_s', ''), column_ifexists('StorageFreeMB_d', ''), column_ifexists('StorageFreeMB', ''))),
-                valTempC = todouble(coalesce(column_ifexists('DeviceTempC_s', ''), column_ifexists('DeviceTempC_d', ''), column_ifexists('DeviceTempC', ''))),
-                valBatteryTempC = todouble(coalesce(column_ifexists('BatteryTempC_s', ''), column_ifexists('BatteryTempC_d', ''), column_ifexists('BatteryTempC', ''))),
-                valThermalLevel = todouble(coalesce(column_ifexists('ThermalStatusLevel_s', ''), column_ifexists('ThermalStatusLevel_d', ''), column_ifexists('ThermalStatusLevel', '')))
+            | extend
+                srcCPU = coalesce(tostring(column_ifexists('CPUUsage_s', '')), tostring(column_ifexists('CPUUsage', ''))),
+                srcRamUsed = coalesce(tostring(column_ifexists('RamUsedMB_s', '')), tostring(column_ifexists('RamUsedMB_d', '')), tostring(column_ifexists('RamUsedMB', ''))),
+                srcRamTotal = coalesce(tostring(column_ifexists('RamTotalMB_s', '')), tostring(column_ifexists('RamTotalMB_d', '')), tostring(column_ifexists('RamTotalMB', ''))),
+                srcBattery = coalesce(tostring(column_ifexists('BatteryLevel_s', '')), tostring(column_ifexists('BatteryLevel_d', '')), tostring(column_ifexists('BatteryLevel', ''))),
+                srcDisk = coalesce(tostring(column_ifexists('StorageFreeMB_s', '')), tostring(column_ifexists('StorageFreeMB_d', '')), tostring(column_ifexists('StorageFreeMB', ''))),
+                srcTempC = coalesce(tostring(column_ifexists('DeviceTempC_s', '')), tostring(column_ifexists('DeviceTempC_d', '')), tostring(column_ifexists('DeviceTempC', ''))),
+                srcBatteryTempC = coalesce(tostring(column_ifexists('BatteryTempC_s', '')), tostring(column_ifexists('BatteryTempC_d', '')), tostring(column_ifexists('BatteryTempC', ''))),
+                srcThermalLevel = coalesce(tostring(column_ifexists('ThermalStatusLevel_s', '')), tostring(column_ifexists('ThermalStatusLevel_d', '')), tostring(column_ifexists('ThermalStatusLevel', '')))
+            | extend
+                valCPU = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, srcCPU)),
+                valRamUsed = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, srcRamUsed)),
+                valRamTotal = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, srcRamTotal)),
+                valBattery = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, srcBattery)),
+                valDisk = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, srcDisk)),
+                valTempC = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, srcTempC)),
+                valBatteryTempC = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, srcBatteryTempC)),
+                valThermalLevel = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, srcThermalLevel))
             | extend 
                 perRam = iff(isnotnull(valRamTotal) and valRamTotal > 0.0 and isnotnull(valRamUsed), (valRamUsed / valRamTotal) * 100.0, real(null)),
                 perBattery = iff(isnull(valBattery), real(null), iff(valBattery <= 1.0, valBattery * 100.0, valBattery))
