@@ -70,7 +70,7 @@ class DeviceHealthModule(private val reactContext: ReactApplicationContext) :
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
     val pm = reactContext.getSystemService(PowerManager::class.java) ?: return null
     return try {
-      pm.getThermalHeadroom(0)
+      pm.getThermalHeadroom(0).toDouble()
     } catch (_: Exception) {
       null
     }
