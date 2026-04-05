@@ -15,8 +15,8 @@ import android.net.Uri
  */
 class AdbRecordReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
-        val action = intent?.action ?: return
-        val command = when (action) {
+        val receivedAction = intent?.action ?: return
+        val command = when (receivedAction) {
             ACTION_START -> "start"
             ACTION_STOP -> "stop"
             ACTION_TOGGLE -> "toggle"
