@@ -8,7 +8,7 @@ import DeviceViews from "@/app/components/DeviceViews"
 import DeviceActions from "@/app/components/DeviceActions"
 import DeviceContent from "@/app/components/DeviceContent"
 import TimeDisplay from "@/app/components/TimeDisplay"
-import { Wifi, Radio, BatteryCharging } from "lucide-react"
+import { Wifi, Radio, BatteryCharging, Thermometer } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -165,6 +165,22 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                                             }
                                         })()}
                                         {device.lowPowerMode && <span className="ml-2 text-xs text-yellow-500">(Ahorro activado)</span>}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt className="text-sm text-slate-400 flex items-center gap-2">
+                                        <Thermometer className="w-4 h-4" /> Estado Térmico
+                                    </dt>
+                                    <dd className="text-sm text-white mt-1">
+                                        {device.batteryTempC != null ? `${device.batteryTempC.toFixed(1)} °C` : "N/A"}
+                                        {typeof device.thermalStatus === "string" && (
+                                            <span className="ml-2 text-xs text-slate-400 capitalize">({device.thermalStatus})</span>
+                                        )}
+                                        {(device.thermalStatusCode ?? 0) >= 3 && (
+                                            <span className="ml-2 text-xs text-orange-400">
+                                                Riesgo de corte térmico
+                                            </span>
+                                        )}
                                     </dd>
                                 </div>
                                 <div>

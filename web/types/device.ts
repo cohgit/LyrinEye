@@ -19,6 +19,10 @@ export interface TelemetryData {
     ram: number
     battery: number
     storage: number
+    temperatureC?: number
+    batteryTempC?: number
+    thermalLevel?: number
+    thermalHeadroom?: number
 }
 
 export interface DeviceDetail extends Device {
@@ -36,4 +40,8 @@ export interface DeviceDetail extends Device {
     ramUsed?: number // MB
     batteryStatus?: string
     lowPowerMode?: boolean
+    batteryTempC?: number
+    thermalStatus?: string
+    thermalStatusCode?: number
+    thermalHeadroom?: number
 }

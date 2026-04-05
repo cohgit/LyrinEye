@@ -503,7 +503,10 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
                 valRamUsed = todouble(coalesce(column_ifexists('RamUsedMB_s', ''), column_ifexists('RamUsedMB_d', ''), column_ifexists('RamUsedMB', ''))),
                 valRamTotal = todouble(coalesce(column_ifexists('RamTotalMB_s', ''), column_ifexists('RamTotalMB_d', ''), column_ifexists('RamTotalMB', ''))),
                 valBattery = todouble(coalesce(column_ifexists('BatteryLevel_s', ''), column_ifexists('BatteryLevel_d', ''), column_ifexists('BatteryLevel', ''))),
-                valDisk = todouble(coalesce(column_ifexists('StorageFreeMB_s', ''), column_ifexists('StorageFreeMB_d', ''), column_ifexists('StorageFreeMB', '')))
+                valDisk = todouble(coalesce(column_ifexists('StorageFreeMB_s', ''), column_ifexists('StorageFreeMB_d', ''), column_ifexists('StorageFreeMB', ''))),
+                valTempC = todouble(coalesce(column_ifexists('DeviceTempC_s', ''), column_ifexists('DeviceTempC_d', ''), column_ifexists('DeviceTempC', ''))),
+                valBatteryTempC = todouble(coalesce(column_ifexists('BatteryTempC_s', ''), column_ifexists('BatteryTempC_d', ''), column_ifexists('BatteryTempC', ''))),
+                valThermalLevel = todouble(coalesce(column_ifexists('ThermalStatusLevel_s', ''), column_ifexists('ThermalStatusLevel_d', ''), column_ifexists('ThermalStatusLevel', '')))
             | extend 
                 perRam = iff(isnotnull(valRamTotal) and valRamTotal > 0.0 and isnotnull(valRamUsed), (valRamUsed / valRamTotal) * 100.0, real(null)),
                 perBattery = iff(isnull(valBattery), real(null), iff(valBattery <= 1.0, valBattery * 100.0, valBattery))
@@ -511,7 +514,10 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
                 AvgCPU = avg(valCPU),
                 AvgRAM = avg(perRam),
                 AvgBattery = avg(perBattery),
-                AvgDisk = avg(valDisk)
+                AvgDisk = avg(valDisk),
+                AvgTempC = avg(valTempC),
+                AvgBatteryTempC = avg(valBatteryTempC),
+                AvgThermalLevel = avg(valThermalLevel)
               by Timestamp=bin(TimeGenerated, ${granularity})
             | order by Timestamp asc`;
 
@@ -534,7 +540,10 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
                     cpu: Number.isFinite(Number(entry.AvgCPU)) ? Number(entry.AvgCPU) : 0,
                     ram: Number.isFinite(Number(entry.AvgRAM)) ? Number(entry.AvgRAM) : 0,
                     battery: Number.isFinite(Number(entry.AvgBattery)) ? Number(entry.AvgBattery) : 0,
-                    diskFree: Number.isFinite(Number(entry.AvgDisk)) ? Number(entry.AvgDisk) : 0
+                    diskFree: Number.isFinite(Number(entry.AvgDisk)) ? Number(entry.AvgDisk) : 0,
+                    temperatureC: Number.isFinite(Number(entry.AvgTempC)) ? Number(entry.AvgTempC) : 0,
+                    batteryTempC: Number.isFinite(Number(entry.AvgBatteryTempC)) ? Number(entry.AvgBatteryTempC) : 0,
+                    thermalLevel: Number.isFinite(Number(entry.AvgThermalLevel)) ? Number(entry.AvgThermalLevel) : 0
                 };
             });
         }

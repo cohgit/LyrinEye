@@ -4,6 +4,21 @@ import DeviceInfo from 'react-native-device-info';
 // We have react-native-fs installed? Yes.
 import RNFS from 'react-native-fs';
 import Geolocation from '@react-native-community/geolocation';
+import { NativeModules, Platform } from 'react-native';
+
+type ThermalInfo = {
+    batteryTempC: number | null;
+    thermalStatus: string;
+    thermalStatusCode: number;
+    thermalHeadroom: number | null;
+    powerSaveMode: boolean;
+    deviceIdleMode: boolean;
+    ignoringBatteryOptimizations: boolean;
+};
+
+const deviceHealth = (NativeModules as any).DeviceHealthModule as {
+    getHealthSnapshot?: () => Promise<Partial<ThermalInfo>>;
+} | undefined;
 
 class TelemetryService {
     private intervalId: ReturnType<typeof setInterval> | null = null;
@@ -61,6 +76,7 @@ class TelemetryService {
 
             // Geolocation
             const coords = await this.getCoordinates();
+            const thermal = await this.getThermalInfo();
 
             const telemetryData = {
                 BatteryLevel: batteryLevel.toFixed(4),
@@ -74,6 +90,15 @@ class TelemetryService {
                 Mode: 'owner', // Defaulting to owner for now, could be made configurable
                 Latitude: coords?.lat?.toFixed(6) ?? 'N/A',
                 Longitude: coords?.lon?.toFixed(6) ?? 'N/A',
+                BatteryTempC: thermal.batteryTempC != null ? thermal.batteryTempC.toFixed(1) : 'N/A',
+                DeviceTempC: thermal.batteryTempC != null ? thermal.batteryTempC.toFixed(1) : 'N/A',
+                ThermalStatus: thermal.thermalStatus || 'unknown',
+                ThermalStatusCode: thermal.thermalStatusCode ?? -1,
+                ThermalStatusLevel: thermal.thermalStatusCode ?? -1,
+                ThermalHeadroom: thermal.thermalHeadroom ?? 'N/A',
+                PowerSaveMode: thermal.powerSaveMode,
+                DeviceIdleMode: thermal.deviceIdleMode,
+                IgnoringBatteryOptimizations: thermal.ignoringBatteryOptimizations,
                 Timestamp: new Date().toISOString()
             };
 
@@ -81,6 +106,42 @@ class TelemetryService {
 
         } catch (error) {
             console.warn('Failed to collect telemetry', error);
+        }
+    }
+
+    private async getThermalInfo(): Promise<ThermalInfo> {
+        if (Platform.OS !== 'android' || !deviceHealth?.getHealthSnapshot) {
+            return {
+                batteryTempC: null,
+                thermalStatus: 'unsupported',
+                thermalStatusCode: -1,
+                thermalHeadroom: null,
+                powerSaveMode: false,
+                deviceIdleMode: false,
+                ignoringBatteryOptimizations: false,
+            };
+        }
+        try {
+            const info = await deviceHealth.getHealthSnapshot();
+            return {
+                batteryTempC: info?.batteryTempC ?? null,
+                thermalStatus: info?.thermalStatus || 'unknown',
+                thermalStatusCode: typeof info?.thermalStatusCode === 'number' ? info.thermalStatusCode : -1,
+                thermalHeadroom: typeof info?.thermalHeadroom === 'number' ? info.thermalHeadroom : null,
+                powerSaveMode: info?.powerSaveMode === true,
+                deviceIdleMode: info?.deviceIdleMode === true,
+                ignoringBatteryOptimizations: info?.ignoringBatteryOptimizations === true,
+            };
+        } catch {
+            return {
+                batteryTempC: null,
+                thermalStatus: 'error',
+                thermalStatusCode: -1,
+                thermalHeadroom: null,
+                powerSaveMode: false,
+                deviceIdleMode: false,
+                ignoringBatteryOptimizations: false,
+            };
         }
     }
 

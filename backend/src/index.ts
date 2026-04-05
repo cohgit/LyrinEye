@@ -535,6 +535,10 @@ app.get('/api/devices/:id', async (req, res) => {
         const ramUsed = getVal(telemetry, 'RamUsedMB');
         const batteryStatus = getVal(telemetry, 'BatteryStatus');
         const lowPowerMode = getVal(telemetry, 'LowPowerMode');
+        const batteryTemp = getVal(telemetry, 'BatteryTempC');
+        const thermalStatus = getVal(telemetry, 'ThermalStatus');
+        const thermalCode = getVal(telemetry, 'ThermalStatusCode');
+        const thermalHeadroom = getVal(telemetry, 'ThermalHeadroom');
         const lat = getVal(telemetry, 'Latitude');
         const lon = getVal(telemetry, 'Longitude');
 
@@ -562,6 +566,10 @@ app.get('/api/devices/:id', async (req, res) => {
             ramUsed: ramUsed ? parseFloat(ramUsed) : undefined,
             batteryStatus: batteryStatus || undefined,
             lowPowerMode: lowPowerMode === 'Yes' || lowPowerMode === true || lowPowerMode === "true",
+            batteryTempC: batteryTemp ? parseFloat(batteryTemp) : undefined,
+            thermalStatus: thermalStatus || undefined,
+            thermalStatusCode: thermalCode != null ? Number(thermalCode) : undefined,
+            thermalHeadroom: thermalHeadroom != null ? Number(thermalHeadroom) : undefined,
             telemetry: telemetry || {}
         };
 

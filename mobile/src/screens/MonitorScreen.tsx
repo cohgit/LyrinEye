@@ -16,11 +16,17 @@ import NetInfo from '@react-native-community/netinfo';
 
 const RECORDING_DURATION_MS = 60000; // 1 minute per chunk
 
-const configuration = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-    ],
+const requestIgnoreBatteryOptimization = async () => {
+    if (Platform.OS !== 'android') return;
+    try {
+        const { DeviceHealthModule } = require('react-native').NativeModules as any;
+        if (DeviceHealthModule?.requestIgnoreBatteryOptimizations) {
+            await DeviceHealthModule.requestIgnoreBatteryOptimizations();
+            AzureLogger.log('Requested ignore battery optimizations');
+        }
+    } catch (e) {
+        AzureLogger.log('Failed requesting battery optimization ignore', { error: String(e) }, 'WARN');
+    }
 };
 
 const MonitorScreen = ({ navigation, route }: any) => {
@@ -91,6 +97,9 @@ const MonitorScreen = ({ navigation, route }: any) => {
                 } catch (err) {
                     console.warn(err);
                 }
+
+                // Anti-corte: prompt user to exempt app from battery optimization.
+                await requestIgnoreBatteryOptimization();
             }
         })();
 
@@ -246,7 +255,6 @@ const MonitorScreen = ({ navigation, route }: any) => {
                 socketId: socketRef.current?.id
             });
             setMode('streaming');
-            pendingViewers.current.push(viewerId);
         });
 
         // Use uniqueId as roomId for signaling presence

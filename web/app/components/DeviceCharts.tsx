@@ -42,7 +42,12 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
 
                 const granularity = RANGES.find(r => r.value === range)?.granularity || '1h'
                 const stats = await getTelemetryStats(deviceId, start.toISOString(), end, granularity)
-                setData(stats)
+                const normalized = (stats || []).map((row: any) => ({
+                    ...row,
+                    thermalLevel: Number.isFinite(Number(row?.thermalLevel)) ? Number(row.thermalLevel) : 0,
+                    batteryTempC: Number.isFinite(Number(row?.batteryTempC)) ? Number(row.batteryTempC) : 0,
+                }))
+                setData(normalized)
             } catch (error) {
                 console.error("Failed to load charts:", error)
             } finally {
@@ -108,13 +113,13 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* CPU & RAM Chart */}
+                    {/* CPU */}
                     <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
                         <h3 className="text-sm font-medium text-slate-300 mb-6 flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
-                            Rendimiento (CPU / RAM)
+                            CPU
                         </h3>
-                        <div className="h-64">
+                        <div className="h-56">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={data}>
                                     <defs>
@@ -122,58 +127,49 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                                             <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3} />
                                             <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
                                         </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
+                                    <Tooltip content={<CustomTooltip />} />
+                                    <Area type="monotone" dataKey="cpu" name="CPU" stroke="#818cf8" fillOpacity={1} fill="url(#colorCpu)" unit="%" strokeWidth={2} />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* RAM */}
+                    <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
+                        <h3 className="text-sm font-medium text-slate-300 mb-6 flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                            RAM
+                        </h3>
+                        <div className="h-56">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={data}>
+                                    <defs>
                                         <linearGradient id="colorRam" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
                                             <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                    <XAxis
-                                        dataKey="timestamp"
-                                        tickFormatter={formatDate}
-                                        stroke="#64748b"
-                                        tick={{ fontSize: 10 }}
-                                        tickMargin={10}
-                                    />
-                                    <YAxis
-                                        stroke="#64748b"
-                                        tick={{ fontSize: 10 }}
-                                        domain={[0, 100]}
-                                        unit="%"
-                                    />
+                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
                                     <Tooltip content={<CustomTooltip />} />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="cpu"
-                                        name="CPU"
-                                        stroke="#818cf8"
-                                        fillOpacity={1}
-                                        fill="url(#colorCpu)"
-                                        unit="%"
-                                        strokeWidth={2}
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="ram"
-                                        name="RAM"
-                                        stroke="#34d399"
-                                        fillOpacity={1}
-                                        fill="url(#colorRam)"
-                                        unit="%"
-                                        strokeWidth={2}
-                                    />
+                                    <Area type="monotone" dataKey="ram" name="RAM" stroke="#34d399" fillOpacity={1} fill="url(#colorRam)" unit="%" strokeWidth={2} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
 
-                    {/* Battery Chart */}
+                    {/* Battery */}
                     <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
                         <h3 className="text-sm font-medium text-slate-300 mb-6 flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                            Nivel de Batería
+                            <div className="w-2 h-2 rounded-full bg-pink-500"></div>
+                            Batería
                         </h3>
-                        <div className="h-64">
+                        <div className="h-56">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={data}>
                                     <defs>
@@ -183,31 +179,68 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                    <XAxis
-                                        dataKey="timestamp"
-                                        tickFormatter={formatDate}
-                                        stroke="#64748b"
-                                        tick={{ fontSize: 10 }}
-                                        tickMargin={10}
-                                    />
-                                    <YAxis
-                                        stroke="#64748b"
-                                        tick={{ fontSize: 10 }}
-                                        domain={[0, 100]}
-                                        unit="%"
-                                    />
+                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
                                     <Tooltip content={<CustomTooltip />} />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="battery"
-                                        name="Batería"
-                                        stroke="#ec4899"
-                                        fillOpacity={1}
-                                        fill="url(#colorBattery)"
-                                        unit="%"
-                                        strokeWidth={2}
-                                    />
+                                    <Area type="monotone" dataKey="battery" name="Batería" stroke="#ec4899" fillOpacity={1} fill="url(#colorBattery)" unit="%" strokeWidth={2} />
                                 </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Battery Temperature */}
+                    <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
+                        <h3 className="text-sm font-medium text-slate-300 mb-6 flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+                            Temperatura de Batería (°C)
+                        </h3>
+                        <div className="h-56">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={data}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} unit="°C" />
+                                    <Tooltip content={<CustomTooltip />} />
+                                    <Line type="monotone" dataKey="batteryTempC" name="Temp batería" stroke="#f97316" dot={false} unit="°C" strokeWidth={2} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Thermal Severity */}
+                    <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
+                        <h3 className="text-sm font-medium text-slate-300 mb-6 flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                            Severidad Térmica
+                        </h3>
+                        <div className="h-56">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={data}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 6]} />
+                                    <Tooltip content={<CustomTooltip />} />
+                                    <Line type="monotone" dataKey="thermalLevel" name="Thermal" stroke="#ef4444" dot={false} strokeWidth={2} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Storage */}
+                    <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
+                        <h3 className="text-sm font-medium text-slate-300 mb-6 flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
+                            Almacenamiento Libre (MB)
+                        </h3>
+                        <div className="h-56">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={data}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                                    <Tooltip content={<CustomTooltip />} />
+                                    <Line type="monotone" dataKey="diskFree" name="Storage" stroke="#06b6d4" dot={false} strokeWidth={2} />
+                                </LineChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
