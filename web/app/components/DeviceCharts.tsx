@@ -25,6 +25,9 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
     const [data, setData] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
+    const hasAnyValue = (rows: any[], key: string) =>
+        rows.some((row) => typeof row?.[key] === "number" && Number.isFinite(row[key]))
+
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true)
@@ -120,21 +123,27 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                             CPU
                         </h3>
                         <div className="h-56">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={data}>
-                                    <defs>
-                                        <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Area type="monotone" dataKey="cpu" name="CPU" stroke="#818cf8" fillOpacity={1} fill="url(#colorCpu)" unit="%" strokeWidth={2} />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                            {hasAnyValue(data, "cpu") ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={data}>
+                                        <defs>
+                                            <linearGradient id="colorCpu" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                        <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Area type="monotone" dataKey="cpu" name="CPU" stroke="#818cf8" fillOpacity={1} fill="url(#colorCpu)" unit="%" strokeWidth={2} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                                    Sin dato de CPU
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -170,21 +179,27 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                             Batería
                         </h3>
                         <div className="h-56">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={data}>
-                                    <defs>
-                                        <linearGradient id="colorBattery" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Area type="monotone" dataKey="battery" name="Batería" stroke="#ec4899" fillOpacity={1} fill="url(#colorBattery)" unit="%" strokeWidth={2} />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                            {hasAnyValue(data, "battery") ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={data}>
+                                        <defs>
+                                            <linearGradient id="colorBattery" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                        <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Area type="monotone" dataKey="battery" name="Batería" stroke="#ec4899" fillOpacity={1} fill="url(#colorBattery)" unit="%" strokeWidth={2} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                                    Sin dato de batería
+                                </div>
+                            )}
                         </div>
                     </div>
 

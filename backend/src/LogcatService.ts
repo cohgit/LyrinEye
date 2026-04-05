@@ -545,15 +545,19 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
                     const colName = col.name as string;
                     if (colName) entry[colName] = row[idx];
                 });
+                const parseNumberOrNull = (v: any): number | null => {
+                    const n = Number(v);
+                    return Number.isFinite(n) ? n : null;
+                };
                 return {
                     timestamp: entry.Timestamp,
-                    cpu: Number.isFinite(Number(entry.AvgCPU)) ? Number(entry.AvgCPU) : 0,
-                    ram: Number.isFinite(Number(entry.AvgRAM)) ? Number(entry.AvgRAM) : 0,
-                    battery: Number.isFinite(Number(entry.AvgBattery)) ? Number(entry.AvgBattery) : 0,
-                    diskFree: Number.isFinite(Number(entry.AvgDisk)) ? Number(entry.AvgDisk) : 0,
-                    temperatureC: Number.isFinite(Number(entry.AvgTempC)) ? Number(entry.AvgTempC) : 0,
-                    batteryTempC: Number.isFinite(Number(entry.AvgBatteryTempC)) ? Number(entry.AvgBatteryTempC) : 0,
-                    thermalLevel: Number.isFinite(Number(entry.AvgThermalLevel)) ? Number(entry.AvgThermalLevel) : 0
+                    cpu: parseNumberOrNull(entry.AvgCPU),
+                    ram: parseNumberOrNull(entry.AvgRAM),
+                    battery: parseNumberOrNull(entry.AvgBattery),
+                    diskFree: parseNumberOrNull(entry.AvgDisk),
+                    temperatureC: parseNumberOrNull(entry.AvgTempC),
+                    batteryTempC: parseNumberOrNull(entry.AvgBatteryTempC),
+                    thermalLevel: parseNumberOrNull(entry.AvgThermalLevel)
                 };
             });
         }
