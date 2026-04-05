@@ -13,6 +13,7 @@ import KeepAwake from 'react-native-keep-awake';
 import ScreenBrightness from 'react-native-screen-brightness';
 import { mediasoupClient } from '../utils/MediasoupClient';
 import NetInfo from '@react-native-community/netinfo';
+import { AdbCommand } from '../utils/adbDeepLink';
 
 const RECORDING_DURATION_MS = 60000; // 1 minute per chunk
 
@@ -53,6 +54,7 @@ const MonitorScreen = ({ navigation, route }: any) => {
     const recordingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const snapshotInterval = useRef<ReturnType<typeof setInterval> | null>(null);
     const currentSnapshots = useRef<string[]>([]);
+    const lastAdbCommandId = useRef<string | null>(null);
 
     // Initial Permissions & Setup
     useEffect(() => {
@@ -165,14 +167,56 @@ const MonitorScreen = ({ navigation, route }: any) => {
         };
     }, []);
 
-    // ADB / deep link: lyrineye://adb/record — inicia grabación sin pulsar INICIAR
+    const applyAdbCommand = useCallback((command: AdbCommand, commandId?: string) => {
+        if (commandId && lastAdbCommandId.current === commandId) return;
+        if (commandId) lastAdbCommandId.current = commandId;
+
+        if (command === 'start') {
+            AzureLogger.log('ADB command: start recording', { commandId: commandId || null });
+            setMode(prev => (prev === 'recording' ? prev : 'recording'));
+            KeepAwake.activate();
+            return;
+        }
+
+        if (command === 'stop') {
+            AzureLogger.log('ADB command: stop monitoring', { commandId: commandId || null });
+            setMode('idle');
+            KeepAwake.deactivate();
+            return;
+        }
+
+        if (command === 'toggle') {
+            AzureLogger.log('ADB command: toggle monitoring', { commandId: commandId || null });
+            setMode(prev => {
+                const next = prev === 'idle' ? 'recording' : 'idle';
+                if (next === 'recording') KeepAwake.activate();
+                else KeepAwake.deactivate();
+                return next;
+            });
+            return;
+        }
+    }, []);
+
+    // Backward compatibility + command-based ADB deep links.
     useEffect(() => {
-        if (!route.params?.adbAutoRecord) return;
-        navigation.setParams({ adbAutoRecord: undefined });
-        AzureLogger.log('ADB auto-start recording');
-        setMode('recording');
-        KeepAwake.activate();
-    }, [route.params?.adbAutoRecord, navigation]);
+        if (route.params?.adbAutoRecord) {
+            applyAdbCommand('start', route.params?.adbCommandId || `legacy-${Date.now()}`);
+            navigation.setParams({ adbAutoRecord: undefined });
+            return;
+        }
+
+        const adbCommand = route.params?.adbCommand as AdbCommand | undefined;
+        if (!adbCommand) return;
+
+        applyAdbCommand(adbCommand, route.params?.adbCommandId);
+        navigation.setParams({ adbCommand: undefined, adbCommandId: undefined });
+    }, [
+        route.params?.adbAutoRecord,
+        route.params?.adbCommand,
+        route.params?.adbCommandId,
+        applyAdbCommand,
+        navigation
+    ]);
 
     const resetInactivityTimer = useCallback(() => {
         if (inactivityTimer.current) clearTimeout(inactivityTimer.current);

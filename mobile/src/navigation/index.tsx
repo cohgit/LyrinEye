@@ -9,17 +9,21 @@ import ViewerScreen from '../screens/ViewerScreen';
 import LoginScreen from '../screens/LoginScreen';
 import { authService } from '../utils/AuthService';
 import { navigationRef } from './navigationRef';
-import { isAdbRecordDeepLink } from '../utils/adbDeepLink';
+import { parseAdbCommandFromUrl } from '../utils/adbDeepLink';
 
 const Stack = createNativeStackNavigator();
 
 const AppNavigator = () => {
     useEffect(() => {
         const sub = Linking.addEventListener('url', async ({ url }) => {
-            if (!isAdbRecordDeepLink(url)) return;
+            const cmd = parseAdbCommandFromUrl(url);
+            if (!cmd) return;
             const user = await authService.getCurrentUser();
             if (!user || !navigationRef.isReady()) return;
-            navigationRef.navigate('Monitor', { adbAutoRecord: true });
+            navigationRef.navigate('Monitor', {
+                adbCommand: cmd.action,
+                adbCommandId: cmd.commandId,
+            });
         });
         return () => sub.remove();
     }, []);

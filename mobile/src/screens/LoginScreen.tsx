@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Image, Linking } from 'react-native';
 import { authService } from '../utils/AuthService';
 import { AzureLogger } from '../utils/AzureLogger';
-import { isAdbRecordDeepLink } from '../utils/adbDeepLink';
+import { parseAdbCommandFromUrl } from '../utils/adbDeepLink';
 
 const LoginScreen = ({ navigation }: any) => {
     const [loading, setLoading] = useState(false);
@@ -11,12 +11,15 @@ const LoginScreen = ({ navigation }: any) => {
         let cancelled = false;
         (async () => {
             const initialUrl = await Linking.getInitialURL();
-            const adbRecord = isAdbRecordDeepLink(initialUrl);
+            const adbCmd = parseAdbCommandFromUrl(initialUrl);
             const user = await authService.getCurrentUser();
             if (cancelled) return;
             if (user) {
-                if (adbRecord) {
-                    navigation.replace('Monitor', { adbAutoRecord: true });
+                if (adbCmd) {
+                    navigation.replace('Monitor', {
+                        adbCommand: adbCmd.action,
+                        adbCommandId: adbCmd.commandId
+                    });
                 } else {
                     navigation.replace('Home');
                 }

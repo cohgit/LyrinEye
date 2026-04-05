@@ -38,6 +38,9 @@
             <category android:name="android.intent.category.DEFAULT" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="lyrineye" android:host="adb" android:pathPrefix="/record" />
+            <data android:scheme="lyrineye" android:host="adb" android:pathPrefix="/start" />
+            <data android:scheme="lyrineye" android:host="adb" android:pathPrefix="/stop" />
+            <data android:scheme="lyrineye" android:host="adb" android:pathPrefix="/toggle" />
         </intent-filter>
       </activity>
 
@@ -47,6 +50,10 @@
         android:exported="true">
         <intent-filter>
             <action android:name="com.mobile.lyrineye.app.ADB_START_RECORD" />
+            <action android:name="com.mobile.lyrineye.app.ADB_STOP_RECORD" />
+            <action android:name="com.mobile.lyrineye.app.ADB_TOGGLE_RECORD" />
+            <action android:name="com.mobile.lyrineye.app.ADB_STOP" />
+            <action android:name="com.mobile.lyrineye.app.ADB_TOGGLE" />
         </intent-filter>
       </receiver>
     </application>
