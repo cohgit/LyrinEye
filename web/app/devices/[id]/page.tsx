@@ -37,7 +37,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
     let connectionColor = 'text-red-400';
     let connectionDot = 'bg-red-400';
 
-    if (diffMin < 1) {
+    if (device.isTransmitting || diffMin < 2) {
         statusLabel = 'En línea';
         statusColor = 'bg-green-500/20 text-green-400 border-green-500/30';
         statusDot = 'bg-green-400';

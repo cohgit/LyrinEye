@@ -34,6 +34,13 @@ import { initializeFirebase, sendPushNotification } from './FirebaseService';
 import * as LogcatService from './LogcatService';
 import { canonicalIdentityEmail, escapeODataString, identityEmailPartitionKeysForQuery } from './emailIdentity';
 
+function telemetryToRatio(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    return parsed > 1 ? parsed / 100 : parsed;
+}
+
 async function listUserDeviceEntitiesMerged(email: string) {
     const partitionKeys = identityEmailPartitionKeysForQuery(email);
     const byRowKey = new Map<string, Record<string, unknown>>();
@@ -485,6 +492,7 @@ app.get('/api/devices', async (req, res) => {
             const ramTotalMb = toNumberOrNull(getVal(telemetry, 'RamTotalMB'));
             const ramUsedKb = ramUsedFromMeminfoKb ?? (ramUsedMb != null ? Math.round(ramUsedMb * 1024) : null);
             const ramTotalKb = memTotalKb ?? (ramTotalMb != null ? Math.round(ramTotalMb * 1024) : null);
+            const batteryRatio = telemetryToRatio((entity.battery as number) ?? getVal(telemetry, 'BatteryLevel'));
             const streamingFlag = getVal(telemetry, 'Streaming') === true || getVal(telemetry, 'Streaming') === "true";
             const effectiveTransmitting = isTransmitting || (streamingFlag && hasRecentTelemetry);
             const lastSeen = effectiveTransmitting || isRecording
@@ -497,7 +505,7 @@ app.get('/api/devices', async (req, res) => {
                 id: deviceId,
                 name: deviceName || entity.name || deviceId.substring(0, 8),
                 status: 'online',
-                battery: toNumberOrNull((entity.battery as number) ?? getVal(telemetry, 'BatteryLevel')),
+                battery: batteryRatio,
                 cpu: cpuValue,
                 ramUsedKb: ramUsedKb,
                 ramTotalKb: ramTotalKb,
@@ -577,6 +585,7 @@ app.get('/api/devices/:id', async (req, res) => {
         const thermalHeadroom = getVal(telemetry, 'ThermalHeadroom');
         const lat = getVal(telemetry, 'Latitude');
         const lon = getVal(telemetry, 'Longitude');
+        const batteryRatio = telemetryToRatio(battery);
         const telemetryEventRaw = getVal(telemetry, 'EventTime') ?? getVal(telemetry, 'TimeGenerated');
         const telemetryEventMs = telemetryEventRaw ? Date.parse(String(telemetryEventRaw)) : NaN;
         const hasRecentTelemetry = Number.isFinite(telemetryEventMs) && (now - telemetryEventMs) <= 5 * 60 * 1000;
@@ -599,7 +608,7 @@ app.get('/api/devices/:id', async (req, res) => {
                     : ((deviceEntity as any)?.registeredAt || new Date().toISOString())),
             isTransmitting: effectiveTransmitting,
             isRecording: false, // Will be calculated below
-            battery: toNumberOrNull(battery),
+            battery: batteryRatio,
             isCharging: isCharging === true || isCharging === "true",
             cpu: toNumberOrNull(cpu),
             ramTotalKb: memTotalKb ?? (toNumberOrNull(ramMb) != null ? Math.round(Number(ramMb) * 1024) : undefined),

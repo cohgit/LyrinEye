@@ -507,14 +507,39 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
             | extend EventTime = coalesce(ingestion_time(), TimeGenerated)
             | where EventTime between (datetime("${safeStart}") .. datetime("${safeEnd}"))
             | extend
-                srcCPU = coalesce(tostring(column_ifexists('CPUUsage_s', '')), tostring(column_ifexists('CPUUsage', ''))),
-                srcRamUsed = coalesce(tostring(column_ifexists('RamUsedMB_s', '')), tostring(column_ifexists('RamUsedMB_d', '')), tostring(column_ifexists('RamUsedMB', ''))),
-                srcRamTotal = coalesce(tostring(column_ifexists('RamTotalMB_s', '')), tostring(column_ifexists('RamTotalMB_d', '')), tostring(column_ifexists('RamTotalMB', ''))),
-                srcBattery = coalesce(tostring(column_ifexists('BatteryLevel_s', '')), tostring(column_ifexists('BatteryLevel_d', '')), tostring(column_ifexists('BatteryLevel', ''))),
-                srcDisk = coalesce(tostring(column_ifexists('StorageFreeMB_s', '')), tostring(column_ifexists('StorageFreeMB_d', '')), tostring(column_ifexists('StorageFreeMB', ''))),
-                srcTempC = coalesce(tostring(column_ifexists('DeviceTempC_s', '')), tostring(column_ifexists('DeviceTempC_d', '')), tostring(column_ifexists('DeviceTempC', ''))),
-                srcBatteryTempC = coalesce(tostring(column_ifexists('BatteryTempC_s', '')), tostring(column_ifexists('BatteryTempC_d', '')), tostring(column_ifexists('BatteryTempC', ''))),
-                srcThermalLevel = coalesce(tostring(column_ifexists('ThermalStatusLevel_s', '')), tostring(column_ifexists('ThermalStatusLevel_d', '')), tostring(column_ifexists('ThermalStatusLevel', '')))
+                rawCPU_s = trim(' ', tostring(column_ifexists('CPUUsage_s', ''))),
+                rawCPU_d = trim(' ', tostring(column_ifexists('CPUUsage_d', ''))),
+                rawCPU = trim(' ', tostring(column_ifexists('CPUUsage', ''))),
+                rawRamUsed_s = trim(' ', tostring(column_ifexists('RamUsedMB_s', ''))),
+                rawRamUsed_d = trim(' ', tostring(column_ifexists('RamUsedMB_d', ''))),
+                rawRamUsed = trim(' ', tostring(column_ifexists('RamUsedMB', ''))),
+                rawRamTotal_s = trim(' ', tostring(column_ifexists('RamTotalMB_s', ''))),
+                rawRamTotal_d = trim(' ', tostring(column_ifexists('RamTotalMB_d', ''))),
+                rawRamTotal = trim(' ', tostring(column_ifexists('RamTotalMB', ''))),
+                rawBattery_s = trim(' ', tostring(column_ifexists('BatteryLevel_s', ''))),
+                rawBattery_d = trim(' ', tostring(column_ifexists('BatteryLevel_d', ''))),
+                rawBattery = trim(' ', tostring(column_ifexists('BatteryLevel', ''))),
+                rawDisk_s = trim(' ', tostring(column_ifexists('StorageFreeMB_s', ''))),
+                rawDisk_d = trim(' ', tostring(column_ifexists('StorageFreeMB_d', ''))),
+                rawDisk = trim(' ', tostring(column_ifexists('StorageFreeMB', ''))),
+                rawTempC_s = trim(' ', tostring(column_ifexists('DeviceTempC_s', ''))),
+                rawTempC_d = trim(' ', tostring(column_ifexists('DeviceTempC_d', ''))),
+                rawTempC = trim(' ', tostring(column_ifexists('DeviceTempC', ''))),
+                rawBatteryTempC_s = trim(' ', tostring(column_ifexists('BatteryTempC_s', ''))),
+                rawBatteryTempC_d = trim(' ', tostring(column_ifexists('BatteryTempC_d', ''))),
+                rawBatteryTempC = trim(' ', tostring(column_ifexists('BatteryTempC', ''))),
+                rawThermalLevel_s = trim(' ', tostring(column_ifexists('ThermalStatusLevel_s', ''))),
+                rawThermalLevel_d = trim(' ', tostring(column_ifexists('ThermalStatusLevel_d', ''))),
+                rawThermalLevel = trim(' ', tostring(column_ifexists('ThermalStatusLevel', '')))
+            | extend
+                srcCPU = case(isnotempty(rawCPU_s), rawCPU_s, isnotempty(rawCPU_d), rawCPU_d, isnotempty(rawCPU), rawCPU, ''),
+                srcRamUsed = case(isnotempty(rawRamUsed_s), rawRamUsed_s, isnotempty(rawRamUsed_d), rawRamUsed_d, isnotempty(rawRamUsed), rawRamUsed, ''),
+                srcRamTotal = case(isnotempty(rawRamTotal_s), rawRamTotal_s, isnotempty(rawRamTotal_d), rawRamTotal_d, isnotempty(rawRamTotal), rawRamTotal, ''),
+                srcBattery = case(isnotempty(rawBattery_s), rawBattery_s, isnotempty(rawBattery_d), rawBattery_d, isnotempty(rawBattery), rawBattery, ''),
+                srcDisk = case(isnotempty(rawDisk_s), rawDisk_s, isnotempty(rawDisk_d), rawDisk_d, isnotempty(rawDisk), rawDisk, ''),
+                srcTempC = case(isnotempty(rawTempC_s), rawTempC_s, isnotempty(rawTempC_d), rawTempC_d, isnotempty(rawTempC), rawTempC, ''),
+                srcBatteryTempC = case(isnotempty(rawBatteryTempC_s), rawBatteryTempC_s, isnotempty(rawBatteryTempC_d), rawBatteryTempC_d, isnotempty(rawBatteryTempC), rawBatteryTempC, ''),
+                srcThermalLevel = case(isnotempty(rawThermalLevel_s), rawThermalLevel_s, isnotempty(rawThermalLevel_d), rawThermalLevel_d, isnotempty(rawThermalLevel), rawThermalLevel, '')
             | extend
                 valCPU = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, srcCPU)),
                 valRamUsed = todouble(extract('([0-9]+(\\\\.[0-9]+)?)', 1, srcRamUsed)),

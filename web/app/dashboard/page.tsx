@@ -133,7 +133,7 @@ export default async function DashboardPage() {
                             statusLabel = 'Desconocido';
                             statusColor = 'bg-slate-500/20 text-slate-400';
                             showMetrics = false;
-                        } else if (diffMin < 2) {
+                        } else if (diffMin < 5) {
                             statusLabel = 'En línea';
                             statusColor = 'bg-green-500/20 text-green-400';
                         } else if (diffDay < 1) {
