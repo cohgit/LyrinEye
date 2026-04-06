@@ -29,6 +29,12 @@ type MemInfoKpis = {
     cachedKb: number;
 };
 
+type CpuProbeResult = {
+    value: number | null;
+    source: 'native' | 'proc_stat' | 'none';
+    reason?: string;
+};
+
 class TelemetryService {
     private intervalId: ReturnType<typeof setInterval> | null = null;
     private readonly INTERVAL_MS = 60000; // 60 seconds
@@ -77,7 +83,8 @@ class TelemetryService {
             const memInfo = await this.getMemInfoKpis();
 
             // CPU usage: prefer Android native snapshot (more reliable), fallback to proc/stat.
-            const cpuUsage = await this.getCpuUsage(thermal);
+            const cpuProbe = await this.getCpuUsage(thermal);
+            const cpuUsage = cpuProbe.value;
 
             // Device Metrics
             const powerState = await DeviceInfo.getPowerState();
@@ -105,7 +112,10 @@ class TelemetryService {
 
             const ramUsedKb = Math.max(0, memInfo.memTotalKb - memInfo.memAvailableKb);
             if (cpuUsage == null) {
-                console.warn('[TELEMETRY] CPU KPI unavailable; sending partial telemetry snapshot');
+                console.warn('[TELEMETRY] CPU KPI unavailable; sending partial telemetry snapshot', {
+                    source: cpuProbe.source,
+                    reason: cpuProbe.reason || 'unknown'
+                });
             }
 
             const telemetryData: Record<string, unknown> = {
@@ -142,6 +152,8 @@ class TelemetryService {
 
             console.log('[TELEMETRY] Prepared payload', {
                 hasCpu: cpuUsage != null,
+                cpuSource: cpuProbe.source,
+                cpuReason: cpuProbe.reason || null,
                 batteryLevel: telemetryData.BatteryLevel,
                 ramUsedMB: telemetryData.RamUsedMB,
                 ramTotalMB: telemetryData.RamTotalMB,
@@ -196,11 +208,32 @@ class TelemetryService {
         }
     }
 
-    private async getCpuUsage(thermal: ThermalInfo): Promise<number | null> {
+    private async getCpuUsage(thermal: ThermalInfo): Promise<CpuProbeResult> {
         if (typeof thermal.cpuUsagePercent === 'number' && Number.isFinite(thermal.cpuUsagePercent)) {
-            return Math.max(0, Math.min(100, thermal.cpuUsagePercent));
+            return {
+                value: Math.max(0, Math.min(100, thermal.cpuUsagePercent)),
+                source: 'native'
+            };
         }
-        return this.getCPUUsage();
+        if (thermal.cpuUsagePercent != null && !Number.isFinite(thermal.cpuUsagePercent)) {
+            return {
+                value: null,
+                source: 'none',
+                reason: 'native cpuUsagePercent not finite'
+            };
+        }
+        const procUsage = await this.getCPUUsage();
+        if (procUsage == null) {
+            return {
+                value: null,
+                source: 'none',
+                reason: 'proc/stat unavailable or invalid'
+            };
+        }
+        return {
+            value: procUsage,
+            source: 'proc_stat'
+        };
     }
 
     private async getCPUUsage(): Promise<number | null> {
@@ -209,7 +242,13 @@ class TelemetryService {
             const readStat = async () => {
                 const stat = await RNFS.readFile('/proc/stat', 'utf8');
                 const line = stat.split('\n')[0]; // First line is 'cpu' aggregate
+                if (!line || !line.startsWith('cpu ')) {
+                    throw new Error('missing cpu aggregate line');
+                }
                 const parts = line.split(/\s+/).slice(1).map(Number);
+                if (parts.length < 4 || parts.some((n) => !Number.isFinite(n))) {
+                    throw new Error('invalid cpu counters');
+                }
                 const idle = parts[3]; // idle time is index 3
                 const total = parts.reduce((acc, current) => acc + current, 0);
                 return { idle, total };
@@ -223,12 +262,16 @@ class TelemetryService {
             const idleDelta = end.idle - start.idle;
             const totalDelta = end.total - start.total;
 
-            if (totalDelta === 0) return 0;
+            if (totalDelta <= 0) {
+                throw new Error(`invalid totalDelta=${totalDelta}`);
+            }
 
             const usage = 100 * (1 - idleDelta / totalDelta);
             return Number.isFinite(usage) ? Math.max(0, Math.min(100, usage)) : null;
 
         } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn('[TELEMETRY] /proc/stat CPU sampling failed', { message });
             return null;
         }
     }
