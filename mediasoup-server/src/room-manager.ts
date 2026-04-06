@@ -8,6 +8,7 @@ export interface Room {
     consumers: Map<string, Consumer>; // Viewers
     transports: Map<string, WebRtcTransport>;
     recorder?: Recorder;
+    chunkTimer?: NodeJS.Timeout;
 }
 
 export class RoomManager {
@@ -35,6 +36,10 @@ export class RoomManager {
         if (room) {
             // Close all transports
             room.transports.forEach(transport => transport.close());
+            if (room.chunkTimer) {
+                clearInterval(room.chunkTimer);
+                room.chunkTimer = undefined;
+            }
 
             // Close producer
             if (room.producer) {

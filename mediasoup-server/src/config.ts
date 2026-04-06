@@ -86,6 +86,8 @@ export const config = {
     recording: {
         chunkDuration: 60, // seconds
         outputDir: '/tmp/recordings',
+        thumbnailDir: '/tmp/recordings/thumbnails',
+        thumbnailTimestamp: '00:00:03', // capture representative frame at 3s
         videoCodec: 'libx264',
         audioCodec: 'aac',
         format: 'mp4',

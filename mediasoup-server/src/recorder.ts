@@ -4,6 +4,7 @@ import { spawn, ChildProcess } from 'child_process';
 import { Router, Producer, PlainTransport, RtpCodecCapability } from 'mediasoup/node/lib/types';
 import { config } from './config';
 import { BlobServiceClient } from '@azure/storage-blob';
+import axios from 'axios';
 
 export class Recorder {
     private transport?: PlainTransport;
@@ -14,6 +15,9 @@ export class Recorder {
     private readonly producerId: string;
     private readonly isAudio: boolean;
     private blobServiceClient?: BlobServiceClient;
+    private segmentTimer?: NodeJS.Timeout;
+    private currentSdpPath?: string;
+    private segmentStartedAt?: number;
 
     constructor(
         router: Router,
@@ -91,9 +95,12 @@ export class Recorder {
             this.transport.close();
         }
 
-        if (this.process) {
-            this.process.kill('SIGINT');
+        if (this.segmentTimer) {
+            clearInterval(this.segmentTimer);
+            this.segmentTimer = undefined;
         }
+
+        await this.stopCurrentSegment();
     }
 
     // Helper to find a free UDP port (simplified)
@@ -107,43 +114,89 @@ export class Recorder {
         if (!fs.existsSync(recordingDir)) {
             fs.mkdirSync(recordingDir, { recursive: true });
         }
+        const sdpContent = this.createSdp(rtpPort);
+        const sdpPath = path.join(recordingDir, `${this.producerId}-${Date.now()}.sdp`);
+        fs.writeFileSync(sdpPath, sdpContent);
+        this.currentSdpPath = sdpPath;
 
+        await this.startNewSegment();
+        this.segmentTimer = setInterval(() => {
+            this.rotateSegment().catch((error) => {
+                console.error('❌ Failed rotating segment:', error);
+            });
+        }, config.recording.chunkDuration * 1000);
+    }
+
+    private async rotateSegment() {
+        await this.stopCurrentSegment();
+        await this.startNewSegment();
+    }
+
+    private async startNewSegment() {
+        if (!this.currentSdpPath) {
+            throw new Error('Missing SDP path for recorder segment');
+        }
+        const recordingDir = config.recording.outputDir;
         const filename = `${this.roomId}-${this.producerId}-${Date.now()}.${config.recording.format}`;
         const filepath = path.join(recordingDir, filename);
 
-        // Create SDP file for FFmpeg to understand the RTP stream
-        // This is crucial. FFmpeg needs to know codec parameters.
-        const sdpContent = this.createSdp(rtpPort);
-        const sdpPath = path.join(recordingDir, `${this.producerId}.sdp`);
-        fs.writeFileSync(sdpPath, sdpContent);
-
-        // FFmpeg args
         const args = [
             '-protocol_whitelist', 'file,udp,rtp',
-            '-i', sdpPath,
-            '-c:v', 'copy', // Save raw stream (re-encoding is expensive)
+            '-i', this.currentSdpPath,
+            '-c:v', 'copy',
             '-c:a', 'copy',
             '-y',
             filepath
         ];
 
-        console.log(`🎬 Spawning FFmpeg: ffmpeg ${args.join(' ')}`);
-
+        console.log(`🎬 Spawning FFmpeg segment: ffmpeg ${args.join(' ')}`);
+        this.segmentStartedAt = Date.now();
         this.process = spawn('ffmpeg', args);
 
-        this.process.stderr?.on('data', (data) => {
-            // FFmpeg logs to stderr
-            // console.log(`FFmpeg: ${data}`);
+        this.process.stderr?.on('data', () => {
+            // FFmpeg logs to stderr; omit noisy logs by default.
         });
 
         this.process.on('close', async (code) => {
-            console.log(`FFmpeg exited with code ${code}`);
-            // Clean up SDP
-            if (fs.existsSync(sdpPath)) fs.unlinkSync(sdpPath);
-
-            // Upload to Azure
-            await this.uploadToAzure(filepath, filename);
+            console.log(`FFmpeg segment exited with code ${code}`);
+            await this.finalizeSegment(filepath, filename);
         });
+    }
+
+    private async stopCurrentSegment() {
+        if (!this.process) return;
+        const proc = this.process;
+        this.process = undefined;
+        await new Promise<void>((resolve) => {
+            proc.once('close', () => resolve());
+            proc.kill('SIGINT');
+            setTimeout(() => {
+                if (!proc.killed) {
+                    proc.kill('SIGKILL');
+                }
+                resolve();
+            }, 5000);
+        });
+    }
+
+    private async finalizeSegment(filepath: string, filename: string) {
+        try {
+            if (!fs.existsSync(filepath)) return;
+            const ageMs = this.segmentStartedAt ? Date.now() - this.segmentStartedAt : 0;
+            if (ageMs < 2000) {
+                fs.unlinkSync(filepath);
+                return;
+            }
+
+            const uploaded = await this.uploadToAzure(filepath, filename);
+            if (!uploaded) return;
+
+            const thumbnailName = await this.generateAndUploadThumbnail(filepath, filename);
+            await this.notifyBackend(filename, thumbnailName, Math.max(1, Math.round(ageMs / 1000)));
+            fs.unlinkSync(filepath);
+        } catch (error) {
+            console.error('❌ Failed finalizing segment:', error);
+        }
     }
 
     private createSdp(port: number): string {
@@ -167,10 +220,10 @@ ${codec.parameters ? this.fmtpString(codec.payloadType, codec.parameters) : ''}
         return `a=fmtp:${payloadType} ${paramStr}`;
     }
 
-    private async uploadToAzure(filepath: string, blobName: string) {
+    private async uploadToAzure(filepath: string, blobName: string): Promise<boolean> {
         if (!this.blobServiceClient) {
             console.warn('⚠️ No Azure connection string, skipping upload');
-            return;
+            return false;
         }
 
         try {
@@ -182,11 +235,55 @@ ${codec.parameters ? this.fmtpString(codec.payloadType, codec.parameters) : ''}
             await blockBlobClient.uploadFile(filepath);
 
             console.log(`✅ Upload successful: ${blobName}`);
-
-            // Delete local file after upload
-            fs.unlinkSync(filepath);
+            return true;
         } catch (error) {
             console.error('❌ Upload failed:', error);
+            return false;
+        }
+    }
+
+    private async generateAndUploadThumbnail(videoPath: string, videoBlobName: string): Promise<string> {
+        const thumbnailName = videoBlobName.replace(/\.[^.]+$/, '.jpg');
+        const thumbnailPath = path.join(config.recording.outputDir, thumbnailName);
+        try {
+            await new Promise<void>((resolve, reject) => {
+                const args = ['-y', '-i', videoPath, '-ss', '00:00:01.000', '-vframes', '1', thumbnailPath];
+                const thumb = spawn('ffmpeg', args);
+                thumb.on('close', (code) => {
+                    if (code === 0) resolve();
+                    else reject(new Error(`thumbnail ffmpeg exited with ${code}`));
+                });
+                thumb.on('error', reject);
+            });
+
+            if (!this.blobServiceClient || !fs.existsSync(thumbnailPath)) return '';
+            const containerClient = this.blobServiceClient.getContainerClient(config.azure.containerName);
+            await containerClient.createIfNotExists();
+            const blob = containerClient.getBlockBlobClient(thumbnailName);
+            await blob.uploadFile(thumbnailPath);
+            fs.unlinkSync(thumbnailPath);
+            return thumbnailName;
+        } catch (error) {
+            console.warn('⚠️ Thumbnail generation/upload failed:', error);
+            if (fs.existsSync(thumbnailPath)) fs.unlinkSync(thumbnailPath);
+            return '';
+        }
+    }
+
+    private async notifyBackend(blobName: string, thumbnailBlobName: string, durationSec: number) {
+        try {
+            await axios.post(`${config.backend.url}/recordings`, {
+                blobName,
+                thumbnailBlobName,
+                roomId: this.roomId,
+                deviceId: this.roomId,
+                timestamp: new Date().toISOString(),
+                duration: durationSec,
+            }, {
+                timeout: 10000
+            });
+        } catch (error) {
+            console.warn('⚠️ Failed notifying backend recording metadata:', error);
         }
     }
 }

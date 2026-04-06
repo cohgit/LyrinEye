@@ -5,9 +5,8 @@ import cors from 'cors';
 import { config } from './config';
 import { MediasoupManager } from './mediasoup-manager';
 import { RoomManager } from './room-manager';
-import { Recorder } from './recorder';
 import { logger } from './azure-logger';
-import { DtlsParameters, RtpCapabilities, RtpParameters } from 'mediasoup/node/lib/types';
+import { Recorder } from './recorder';
 
 const app = express();
 const httpServer = createServer(app);
@@ -27,6 +26,61 @@ const io = new SocketIOServer(httpServer, {
 // Managers
 const mediasoupManager = new MediasoupManager();
 const roomManager = new RoomManager();
+
+function clearChunkTimer(roomId: string) {
+    const room = roomManager.getRoom(roomId);
+    if (!room?.recordingTimer) return;
+    clearInterval(room.recordingTimer);
+    room.recordingTimer = undefined;
+}
+
+async function restartRoomRecorder(roomId: string): Promise<void> {
+    const room = roomManager.getRoom(roomId);
+    if (!room || !room.producer) {
+        throw new Error('Room or producer not found');
+    }
+
+    const recorder = new Recorder(
+        room.router,
+        roomId,
+        room.producer.id,
+        room.producer.kind === 'audio'
+    );
+    await recorder.start();
+    room.recorder = recorder;
+}
+
+async function rotateRoomChunk(roomId: string): Promise<void> {
+    const room = roomManager.getRoom(roomId);
+    if (!room || !room.recorder) return;
+    try {
+        await room.recorder.rotate();
+    } catch (error) {
+        logger.log('chunk-rotate-failed', {
+            roomId,
+            data: { error: String(error) },
+            level: 'ERROR',
+        });
+        await restartRoomRecorder(roomId);
+    }
+}
+
+function startRoomChunking(roomId: string) {
+    const room = roomManager.getRoom(roomId);
+    if (!room) return;
+
+    clearChunkTimer(roomId);
+    const chunkMs = Math.max(5, config.recording.chunkDuration) * 1000;
+    room.recordingTimer = setInterval(() => {
+        rotateRoomChunk(roomId).catch((error) => {
+            logger.log('chunk-rotate-interval-failed', {
+                roomId,
+                data: { error: String(error) },
+                level: 'ERROR',
+            });
+        });
+    }, chunkMs);
+}
 
 // Health check
 app.get('/health', (req, res) => {
@@ -253,16 +307,8 @@ io.on('connection', (socket) => {
                 throw new Error('Recording already in progress');
             }
 
-            // Initialize recorder
-            const recorder = new Recorder(
-                room.router,
-                roomId,
-                room.producer.id,
-                room.producer.kind === 'audio'
-            );
-
-            await recorder.start();
-            room.recorder = recorder;
+            await restartRoomRecorder(roomId);
+            startRoomChunking(roomId);
 
             callback({ success: true });
         } catch (error: any) {
@@ -281,8 +327,9 @@ io.on('connection', (socket) => {
                 throw new Error('Recording not found');
             }
 
+            clearChunkTimer(roomId);
             await room.recorder.stop();
-            delete room.recorder;
+            room.recorder = undefined;
 
             callback({ success: true });
         } catch (error: any) {
