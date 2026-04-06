@@ -86,10 +86,11 @@ class TelemetryService {
             // Geolocation
             const coords = await this.getCoordinates();
 
-            // If core KPIs are incomplete, do not emit telemetry.
+            // Emit telemetry only when required KPIs are available.
+            // CPU may be unavailable on some Android builds; in that case
+            // we still send the rest of the snapshot without fabricating CPU.
             if (
                 !memInfo ||
-                cpuUsage == null ||
                 !Number.isFinite(batteryLevel) ||
                 freeDiskBytes < 0
             ) {
@@ -103,12 +104,15 @@ class TelemetryService {
             }
 
             const ramUsedKb = Math.max(0, memInfo.memTotalKb - memInfo.memAvailableKb);
-            const telemetryData = {
+            if (cpuUsage == null) {
+                console.warn('[TELEMETRY] CPU KPI unavailable; sending partial telemetry snapshot');
+            }
+
+            const telemetryData: Record<string, unknown> = {
                 BatteryLevel: Number(batteryLevel.toFixed(4)),
                 StorageFreeMB: Number((freeDiskBytes / 1024 / 1024).toFixed(2)),
                 RamUsedMB: Number((ramUsedKb / 1024).toFixed(2)),
                 RamTotalMB: Number((memInfo.memTotalKb / 1024).toFixed(2)),
-                CPUUsage: Number(cpuUsage.toFixed(2)),
                 MemTotalKB: memInfo.memTotalKb,
                 MemFreeKB: memInfo.memFreeKb,
                 MemAvailableKB: memInfo.memAvailableKb,
@@ -131,6 +135,10 @@ class TelemetryService {
                 IgnoringBatteryOptimizations: thermal.ignoringBatteryOptimizations,
                 Timestamp: new Date().toISOString()
             };
+
+            if (cpuUsage != null) {
+                telemetryData.CPUUsage = Number(cpuUsage.toFixed(2));
+            }
 
             await AzureLogger.telemetry(telemetryData);
 
