@@ -28,6 +28,21 @@ const io = new SocketIOServer(httpServer, {
 const mediasoupManager = new MediasoupManager();
 const roomManager = new RoomManager();
 
+async function restartRoomRecorder(roomId: string): Promise<void> {
+    const room = roomManager.getRoom(roomId);
+    if (!room || !room.producer) {
+        throw new Error('Room or producer not found');
+    }
+
+    const recorder = new Recorder(
+        room.router,
+        roomId,
+        room.producer.id,
+        room.producer.kind === 'audio'
+    );
+    await recorder.start();
+    room.recorder = recorder;
+}
 // Health check
 app.get('/health', (req, res) => {
     res.json({
@@ -253,16 +268,7 @@ io.on('connection', (socket) => {
                 throw new Error('Recording already in progress');
             }
 
-            // Initialize recorder
-            const recorder = new Recorder(
-                room.router,
-                roomId,
-                room.producer.id,
-                room.producer.kind === 'audio'
-            );
-
-            await recorder.start();
-            room.recorder = recorder;
+            await restartRoomRecorder(roomId);
 
             callback({ success: true });
         } catch (error: any) {
