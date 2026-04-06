@@ -28,6 +28,11 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
     const hasAnyValue = (rows: any[], key: string) =>
         rows.some((row) => typeof row?.[key] === "number" && Number.isFinite(row[key]))
 
+    const toNumberOrNull = (value: unknown): number | null => {
+        const parsed = Number(value)
+        return Number.isFinite(parsed) ? parsed : null
+    }
+
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true)
@@ -47,8 +52,12 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                 const stats = await getTelemetryStats(deviceId, start.toISOString(), end, granularity)
                 const normalized = (stats || []).map((row: any) => ({
                     ...row,
-                    thermalLevel: Number.isFinite(Number(row?.thermalLevel)) ? Number(row.thermalLevel) : 0,
-                    batteryTempC: Number.isFinite(Number(row?.batteryTempC)) ? Number(row.batteryTempC) : 0,
+                    cpu: toNumberOrNull(row?.cpu),
+                    ram: toNumberOrNull(row?.ram),
+                    battery: toNumberOrNull(row?.battery),
+                    diskFree: toNumberOrNull(row?.diskFree),
+                    batteryTempC: toNumberOrNull(row?.batteryTempC),
+                    thermalLevel: toNumberOrNull(row?.thermalLevel),
                 }))
                 setData(normalized)
             } catch (error) {
@@ -77,7 +86,7 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                     <p className="text-slate-300 text-xs mb-2">{format(new Date(label), "d MMM, HH:mm", { locale: es })}</p>
                     {payload.map((p: any) => (
                         <p key={p.name} className="text-sm font-medium" style={{ color: p.color }}>
-                            {p.name}: {p.value.toFixed(1)}{p.unit}
+                            {p.name}: {typeof p.value === 'number' ? p.value.toFixed(1) : 'N/A'}{p.unit || ''}
                         </p>
                     ))}
                 </div>
@@ -154,21 +163,27 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                             RAM
                         </h3>
                         <div className="h-56">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={data}>
-                                    <defs>
-                                        <linearGradient id="colorRam" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Area type="monotone" dataKey="ram" name="RAM" stroke="#34d399" fillOpacity={1} fill="url(#colorRam)" unit="%" strokeWidth={2} />
-                                </AreaChart>
-                            </ResponsiveContainer>
+                            {hasAnyValue(data, "ram") ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={data}>
+                                        <defs>
+                                            <linearGradient id="colorRam" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#34d399" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#34d399" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                        <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Area type="monotone" dataKey="ram" name="RAM" stroke="#34d399" fillOpacity={1} fill="url(#colorRam)" unit="%" strokeWidth={2} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                                    Sin dato de RAM
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -210,15 +225,21 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                             Temperatura de Batería (°C)
                         </h3>
                         <div className="h-56">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={data}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} unit="°C" />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Line type="monotone" dataKey="batteryTempC" name="Temp batería" stroke="#f97316" dot={false} unit="°C" strokeWidth={2} />
-                                </LineChart>
-                            </ResponsiveContainer>
+                            {hasAnyValue(data, "batteryTempC") ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={data}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                        <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} unit="°C" />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Line type="monotone" dataKey="batteryTempC" name="Temp batería" stroke="#f97316" dot={false} unit="°C" strokeWidth={2} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                                    Sin dato de temperatura
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -229,15 +250,21 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                             Severidad Térmica
                         </h3>
                         <div className="h-56">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={data}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 6]} />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Line type="monotone" dataKey="thermalLevel" name="Thermal" stroke="#ef4444" dot={false} strokeWidth={2} />
-                                </LineChart>
-                            </ResponsiveContainer>
+                            {hasAnyValue(data, "thermalLevel") ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={data}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                        <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 6]} />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Line type="monotone" dataKey="thermalLevel" name="Thermal" stroke="#ef4444" dot={false} strokeWidth={2} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                                    Sin dato de severidad térmica
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -248,15 +275,21 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                             Almacenamiento Libre (MB)
                         </h3>
                         <div className="h-56">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={data}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                                    <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Line type="monotone" dataKey="diskFree" name="Storage" stroke="#06b6d4" dot={false} strokeWidth={2} />
-                                </LineChart>
-                            </ResponsiveContainer>
+                            {hasAnyValue(data, "diskFree") ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={data}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                        <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
+                                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                                        <Tooltip content={<CustomTooltip />} />
+                                        <Line type="monotone" dataKey="diskFree" name="Storage" stroke="#06b6d4" dot={false} strokeWidth={2} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                                    Sin dato de almacenamiento
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
