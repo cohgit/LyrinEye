@@ -2,13 +2,10 @@ import { auth } from "@/auth"
 import { getDeviceDetails } from "@/lib/api"
 import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
-import { formatDistanceToNow } from "date-fns"
-import { es } from "date-fns/locale"
-import DeviceViews from "@/app/components/DeviceViews"
 import DeviceActions from "@/app/components/DeviceActions"
 import DeviceContent from "@/app/components/DeviceContent"
 import TimeDisplay from "@/app/components/TimeDisplay"
-import { Wifi, Radio, BatteryCharging, Thermometer } from "lucide-react"
+import { Wifi, Radio, Thermometer } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -36,15 +33,24 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
     let statusColor = 'bg-red-500/20 text-red-400 border-red-500/30';
     let statusDot = 'bg-red-400';
     let showMetrics = true;
+    let connectionLabel = 'Desconectado';
+    let connectionColor = 'text-red-400';
+    let connectionDot = 'bg-red-400';
 
     if (diffMin < 1) {
         statusLabel = 'En línea';
         statusColor = 'bg-green-500/20 text-green-400 border-green-500/30';
         statusDot = 'bg-green-400';
+        connectionLabel = 'Conectado';
+        connectionColor = 'text-green-400';
+        connectionDot = 'bg-green-400';
     } else if (diffDay < 1) {
         statusLabel = 'Inactivo';
         statusColor = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
         statusDot = 'bg-yellow-400';
+        connectionLabel = 'Inactivo';
+        connectionColor = 'text-yellow-400';
+        connectionDot = 'bg-yellow-400';
     } else {
         statusLabel = 'Desconectado';
         statusColor = 'bg-red-500/20 text-red-400 border-red-500/30';
@@ -186,12 +192,10 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
                                 <div>
                                     <dt className="text-sm text-slate-400">Estado de Conexión</dt>
                                     <dd className="text-sm text-white mt-1">
-                                        {device.telemetry?.ConnectionStart ? (
-                                            <span className="text-green-400 flex items-center gap-1">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
-                                                Conectado
-                                            </span>
-                                        ) : 'Desconectado'}
+                                        <span className={`${connectionColor} flex items-center gap-1`}>
+                                            <div className={`w-1.5 h-1.5 rounded-full ${connectionDot} ${diffMin < 1 ? 'animate-pulse' : ''}`}></div>
+                                            {connectionLabel}
+                                        </span>
                                     </dd>
                                 </div>
                                 {device.location && (
