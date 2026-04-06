@@ -140,6 +140,16 @@ class TelemetryService {
                 telemetryData.CPUUsage = Number(cpuUsage.toFixed(2));
             }
 
+            console.log('[TELEMETRY] Prepared payload', {
+                hasCpu: cpuUsage != null,
+                batteryLevel: telemetryData.BatteryLevel,
+                ramUsedMB: telemetryData.RamUsedMB,
+                ramTotalMB: telemetryData.RamTotalMB,
+                storageFreeMB: telemetryData.StorageFreeMB,
+                isCharging: telemetryData.IsCharging,
+                timestamp: telemetryData.Timestamp
+            });
+
             await AzureLogger.telemetry(telemetryData);
 
         } catch (error) {

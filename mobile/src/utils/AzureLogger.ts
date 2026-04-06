@@ -47,11 +47,21 @@ class AzureLoggerService {
         }
     }
 
-    async telemetry(metrics: Record<string, any>) {
-        await this.log('System Telemetry', metrics, 'INFO', 'LyrinEye_Mobile_Telemetry');
+    async telemetry(metrics: Record<string, any>): Promise<boolean> {
+        const hasCpu = typeof metrics.CPUUsage === 'number' && Number.isFinite(metrics.CPUUsage);
+        const sent = await this.log('System Telemetry', metrics, 'INFO', 'LyrinEye_Mobile_Telemetry');
+        console.log('[TELEMETRY] Delivery result', {
+            sent,
+            hasCpu,
+            timestamp: metrics.Timestamp,
+            battery: metrics.BatteryLevel,
+            ramUsedMB: metrics.RamUsedMB,
+            ramTotalMB: metrics.RamTotalMB
+        });
+        return sent;
     }
 
-    async log(message: string, context: Record<string, any> = {}, level: 'INFO' | 'ERROR' | 'WARN' = 'INFO', logType = 'LyrinEye_Mobile_Log') {
+    async log(message: string, context: Record<string, any> = {}, level: 'INFO' | 'ERROR' | 'WARN' = 'INFO', logType = 'LyrinEye_Mobile_Log'): Promise<boolean> {
         try {
             const netState = await NetInfo.fetch();
 
@@ -74,13 +84,16 @@ class AzureLoggerService {
 
             if (!netState.isConnected) {
                 await this.enqueueLog(logEntry, logType);
-                return;
+                console.warn('[LOGGER] Offline, entry buffered', { logType, message });
+                return false;
             }
 
             await this.sendToAzure(logEntry, logType);
             await this.flushBuffer();
+            return true;
         } catch (err) {
             console.error('Failed to send log to Azure:', err);
+            return false;
         }
     }
 
@@ -122,14 +135,14 @@ class AzureLoggerService {
         await AsyncStorage.setItem(LOG_BUFFER_KEY, JSON.stringify(remaining));
     }
 
-    private async sendToAzure(jsonPayload: any, logType: string) {
+    private async sendToAzure(jsonPayload: any, logType: string): Promise<void> {
         const date = new Date().toUTCString();
         const body = JSON.stringify([jsonPayload]);
         const contentLength = Buffer.byteLength(body, 'utf8');
 
         const signature = this.buildSignature(date, contentLength);
 
-        await fetch(`https://${WORKSPACE_ID}.ods.opinsights.azure.com/api/logs?api-version=2016-04-01`, {
+        const response = await fetch(`https://${WORKSPACE_ID}.ods.opinsights.azure.com/api/logs?api-version=2016-04-01`, {
             method: 'POST',
             headers: {
                 'Authorization': signature,
@@ -140,6 +153,18 @@ class AzureLoggerService {
             },
             body: body
         });
+
+        if (!response.ok) {
+            const responseText = await response.text().catch(() => '');
+            throw new Error(`Azure ingestion failed (${response.status}): ${responseText.slice(0, 300)}`);
+        }
+
+        if (logType === 'LyrinEye_Mobile_Telemetry') {
+            console.log('[TELEMETRY] Azure ingestion OK', {
+                status: response.status,
+                timestamp: jsonPayload?.Timestamp
+            });
+        }
     }
 
     private buildSignature(date: string, contentLength: number): string {
