@@ -306,7 +306,8 @@ export async function getLatestTelemetry(deviceId: string) {
               or column_ifexists('DeviceName', '') =~ "${deviceId}" 
               or column_ifexists('DeviceId_s', '') == "${deviceId}" 
               or column_ifexists('DeviceId', '') == "${deviceId}" 
-            | order by TimeGenerated desc 
+            | extend EventTime = coalesce(ingestion_time(), TimeGenerated)
+            | order by EventTime desc 
             | take 1`;
         const result = await logsQueryClient.queryWorkspace(
             WORKSPACE_ID,
@@ -339,8 +340,12 @@ export async function getLatestTelemetries(deviceIds: string[]) {
         // We use summarize arg_max to get the latest record for each device
         const idList = deviceIds.map(id => `"${id}"`).join(', ');
         const query = `LyrinEye_Mobile_Telemetry_CL 
-            | where column_ifexists('DeviceName', '') in~ (${idList}) or column_ifexists('DeviceId_s', '') in (${idList}) or column_ifexists('DeviceId', '') in (${idList})
-            | summarize arg_max(TimeGenerated, *) by DeviceId = coalesce(column_ifexists('DeviceName', ''), column_ifexists('DeviceId_s', ''), column_ifexists('DeviceId', ''))`;
+            | where column_ifexists('DeviceName_s', '') in~ (${idList}) 
+               or column_ifexists('DeviceName', '') in~ (${idList}) 
+               or column_ifexists('DeviceId_s', '') in (${idList}) 
+               or column_ifexists('DeviceId', '') in (${idList})
+            | extend EventTime = coalesce(ingestion_time(), TimeGenerated)
+            | summarize arg_max(EventTime, *) by DeviceId = coalesce(column_ifexists('DeviceName_s', ''), column_ifexists('DeviceName', ''), column_ifexists('DeviceId_s', ''), column_ifexists('DeviceId', ''))`;
 
         const result = await logsQueryClient.queryWorkspace(
             WORKSPACE_ID,
@@ -360,6 +365,7 @@ export async function getLatestTelemetries(deviceIds: string[]) {
 
                 // Try to find which ID matched
                 const matchedId = deviceIds.find(id =>
+                    (entry.DeviceName_s && entry.DeviceName_s.toLowerCase() === id.toLowerCase()) ||
                     (entry.DeviceName && entry.DeviceName.toLowerCase() === id.toLowerCase()) ||
                     (entry.DeviceId_s === id) ||
                     (entry.DeviceId === id)
@@ -498,7 +504,8 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
               or column_ifexists('DeviceName', '') =~ "${deviceId}" 
               or column_ifexists('DeviceId_s', '') == "${deviceId}" 
               or column_ifexists('DeviceId', '') == "${deviceId}"
-            | where TimeGenerated between (datetime("${safeStart}") .. datetime("${safeEnd}"))
+            | extend EventTime = coalesce(ingestion_time(), TimeGenerated)
+            | where EventTime between (datetime("${safeStart}") .. datetime("${safeEnd}"))
             | extend
                 srcCPU = coalesce(tostring(column_ifexists('CPUUsage_s', '')), tostring(column_ifexists('CPUUsage', ''))),
                 srcRamUsed = coalesce(tostring(column_ifexists('RamUsedMB_s', '')), tostring(column_ifexists('RamUsedMB_d', '')), tostring(column_ifexists('RamUsedMB', ''))),
@@ -530,7 +537,7 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
                 AvgTempC = avg(valTempC),
                 AvgBatteryTempC = avg(valBatteryTempC),
                 AvgThermalLevel = avg(valThermalLevel)
-              by Timestamp=bin(TimeGenerated, ${granularity})
+              by Timestamp=bin(EventTime, ${granularity})
             | order by Timestamp asc`;
 
         const result = await logsQueryClient.queryWorkspace(

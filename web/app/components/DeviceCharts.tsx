@@ -20,6 +20,14 @@ const RANGES: { label: string, value: TimeRange, granularity: '1m' | '1h' | '1d'
     { label: '30d', value: '30d', granularity: '1d' }
 ]
 
+const RANGE_MS: Record<TimeRange, number> = {
+    '1h': 60 * 60 * 1000,
+    '12h': 12 * 60 * 60 * 1000,
+    '24h': 24 * 60 * 60 * 1000,
+    '7d': 7 * 24 * 60 * 60 * 1000,
+    '30d': 30 * 24 * 60 * 60 * 1000,
+}
+
 export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
     const [range, setRange] = useState<TimeRange>('1h')
     const [data, setData] = useState<any[]>([])
@@ -37,19 +45,12 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
         const fetchData = async () => {
             setLoading(true)
             try {
-                const end = new Date().toISOString()
-                const start = new Date()
-
-                switch (range) {
-                    case '1h': start.setHours(start.getHours() - 1); break;
-                    case '12h': start.setHours(start.getHours() - 12); break;
-                    case '24h': start.setHours(start.getHours() - 24); break;
-                    case '7d': start.setDate(start.getDate() - 7); break;
-                    case '30d': start.setDate(start.getDate() - 30); break;
-                }
+                const endDate = new Date()
+                // Build ranges with absolute milliseconds to avoid DST jumps.
+                const startDate = new Date(endDate.getTime() - RANGE_MS[range])
 
                 const granularity = RANGES.find(r => r.value === range)?.granularity || '1h'
-                const stats = await getTelemetryStats(deviceId, start.toISOString(), end, granularity)
+                const stats = await getTelemetryStats(deviceId, startDate.toISOString(), endDate.toISOString(), granularity)
                 const normalized = (stats || []).map((row: any) => ({
                     ...row,
                     cpu: toNumberOrNull(row?.cpu),

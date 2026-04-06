@@ -462,12 +462,16 @@ app.get('/api/devices', async (req, res) => {
             const deviceId = entity.rowKey as string;
             const isTransmitting = LogcatService.isSessionActive(deviceId);
             const telemetry = telemetries.get(deviceId);
+            const now = Date.now();
+            const telemetryEventRaw = getVal(telemetry, 'EventTime') ?? getVal(telemetry, 'TimeGenerated');
+            const telemetryEventMs = telemetryEventRaw ? Date.parse(String(telemetryEventRaw)) : NaN;
+            const hasRecentTelemetry = Number.isFinite(telemetryEventMs) && (now - telemetryEventMs) <= 5 * 60 * 1000;
 
             // Recording status: was there an upload in the last 2 minutes?
             let isRecording = false;
             if (entity.lastRecordingAt) {
                 const lastRec = new Date(entity.lastRecordingAt as string).getTime();
-                isRecording = (Date.now() - lastRec) < 120000;
+                isRecording = (now - lastRec) < 120000;
             }
 
             const deviceName = getVal(telemetry, 'DeviceName');
@@ -481,6 +485,13 @@ app.get('/api/devices', async (req, res) => {
             const ramTotalMb = toNumberOrNull(getVal(telemetry, 'RamTotalMB'));
             const ramUsedKb = ramUsedFromMeminfoKb ?? (ramUsedMb != null ? Math.round(ramUsedMb * 1024) : null);
             const ramTotalKb = memTotalKb ?? (ramTotalMb != null ? Math.round(ramTotalMb * 1024) : null);
+            const streamingFlag = getVal(telemetry, 'Streaming') === true || getVal(telemetry, 'Streaming') === "true";
+            const effectiveTransmitting = isTransmitting || (streamingFlag && hasRecentTelemetry);
+            const lastSeen = effectiveTransmitting || isRecording
+                ? new Date().toISOString()
+                : (Number.isFinite(telemetryEventMs)
+                    ? new Date(telemetryEventMs).toISOString()
+                    : (entity.registeredAt || new Date().toISOString()));
 
             return {
                 id: deviceId,
@@ -490,9 +501,9 @@ app.get('/api/devices', async (req, res) => {
                 cpu: cpuValue,
                 ramUsedKb: ramUsedKb,
                 ramTotalKb: ramTotalKb,
-                lastSeen: isTransmitting || isRecording ? new Date().toISOString() : (entity.registeredAt || new Date().toISOString()),
+                lastSeen,
                 isCharging: getVal(telemetry, 'IsCharging') === true || getVal(telemetry, 'IsCharging') === "true",
-                isTransmitting: isTransmitting,
+                isTransmitting: effectiveTransmitting,
                 isRecording: isRecording,
                 wifiSSID: entity.wifiSSID || getVal(telemetry, 'WifiSSID') || null,
                 appVersion: appVer || entity.appVersion || null,
@@ -526,6 +537,7 @@ app.get('/api/devices/:id', async (req, res) => {
 
         const isTransmitting = LogcatService.isSessionActive(deviceId);
         const telemetry = await LogcatService.getLatestTelemetry(deviceId);
+        const now = Date.now();
 
         // Helper to get value regardless of Azure suffix (_s, _d, _b)
         const getVal = (obj: any, baseKey: string) => {
@@ -565,9 +577,14 @@ app.get('/api/devices/:id', async (req, res) => {
         const thermalHeadroom = getVal(telemetry, 'ThermalHeadroom');
         const lat = getVal(telemetry, 'Latitude');
         const lon = getVal(telemetry, 'Longitude');
+        const telemetryEventRaw = getVal(telemetry, 'EventTime') ?? getVal(telemetry, 'TimeGenerated');
+        const telemetryEventMs = telemetryEventRaw ? Date.parse(String(telemetryEventRaw)) : NaN;
+        const hasRecentTelemetry = Number.isFinite(telemetryEventMs) && (now - telemetryEventMs) <= 5 * 60 * 1000;
         const memTotalKb = toNumberOrNull(memTotalKbRaw);
         const memAvailableKb = toNumberOrNull(memAvailableKbRaw);
         const memUsedKb = (memTotalKb != null && memAvailableKb != null) ? Math.max(0, memTotalKb - memAvailableKb) : null;
+        const isStreamingTelemetry = streaming === true || streaming === "true";
+        const effectiveTransmitting = isTransmitting || (isStreamingTelemetry && hasRecentTelemetry);
 
         console.log(`[DEVICES] Found telemetry for ${deviceId}: ${telemetry ? 'YES' : 'NO'}`);
 
@@ -575,8 +592,12 @@ app.get('/api/devices/:id', async (req, res) => {
             id: deviceId,
             name: deviceName || (deviceEntity as any)?.name || deviceId.substring(0, 8),
             status: 'online',
-            lastSeen: isTransmitting || streaming ? new Date().toISOString() : ((deviceEntity as any)?.registeredAt || new Date().toISOString()),
-            isTransmitting: isTransmitting || streaming === true || streaming === "true",
+            lastSeen: effectiveTransmitting
+                ? new Date().toISOString()
+                : (Number.isFinite(telemetryEventMs)
+                    ? new Date(telemetryEventMs).toISOString()
+                    : ((deviceEntity as any)?.registeredAt || new Date().toISOString())),
+            isTransmitting: effectiveTransmitting,
             isRecording: false, // Will be calculated below
             battery: toNumberOrNull(battery),
             isCharging: isCharging === true || isCharging === "true",
