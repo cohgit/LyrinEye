@@ -4,8 +4,9 @@ export interface Device {
     lastSeen: string
     status: 'online' | 'offline'
     battery: number
-    cpu: number
-    ram: number
+    cpu: number | null
+    ramTotalKb?: number
+    ramUsedKb?: number
     isCharging: boolean
     isTransmitting: boolean
     isRecording: boolean
@@ -37,7 +38,10 @@ export interface DeviceDetail extends Device {
     ipAddress?: string
     streaming?: boolean
     storageFree?: number // MB
-    ramUsed?: number // MB
+    memFreeKb?: number
+    memAvailableKb?: number
+    buffersKb?: number
+    cachedKb?: number
     batteryStatus?: string
     lowPowerMode?: boolean
     batteryTempC?: number

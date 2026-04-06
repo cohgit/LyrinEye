@@ -523,6 +523,8 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
             | summarize 
                 AvgCPU = avg(valCPU),
                 AvgRAM = avg(perRam),
+                AvgRamUsedMB = avg(valRamUsed),
+                AvgRamTotalMB = avg(valRamTotal),
                 AvgBattery = avg(perBattery),
                 AvgDisk = avg(valDisk),
                 AvgTempC = avg(valTempC),
@@ -553,6 +555,8 @@ export async function getTelemetryStats(deviceId: string, start: string, end: st
                     timestamp: entry.Timestamp,
                     cpu: parseNumberOrNull(entry.AvgCPU),
                     ram: parseNumberOrNull(entry.AvgRAM),
+                    ramUsedMB: parseNumberOrNull(entry.AvgRamUsedMB),
+                    ramTotalMB: parseNumberOrNull(entry.AvgRamTotalMB),
                     battery: parseNumberOrNull(entry.AvgBattery),
                     diskFree: parseNumberOrNull(entry.AvgDisk),
                     temperatureC: parseNumberOrNull(entry.AvgTempC),

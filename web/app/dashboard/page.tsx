@@ -15,6 +15,13 @@ function toNum(v: unknown, fallback = 0): number {
     return Number.isFinite(n) ? n : fallback
 }
 
+function formatMemoryFromKb(kb: unknown): string {
+    const n = typeof kb === 'number' ? kb : Number(kb)
+    if (!Number.isFinite(n) || n < 0) return 'N/A'
+    if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(2)} GB`
+    return `${(n / 1024).toFixed(0)} MB`
+}
+
 function modeLabel(mode: unknown): string | null {
     if (mode == null || mode === '') return null
     const s = typeof mode === 'string' ? mode : String(mode)
@@ -103,8 +110,9 @@ export default async function DashboardPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
                     {devices.map((device, idx) => {
                         const battery = toNum(device?.battery, NaN)
-                        const cpu = toNum(device?.cpu, 0)
-                        const ram = toNum(device?.ram, 0)
+                        const cpu = Number.isFinite(Number(device?.cpu)) ? Number(device.cpu) : null
+                        const ramUsedKb = Number.isFinite(Number(device?.ramUsedKb)) ? Number(device.ramUsedKb) : null
+                        const ramTotalKb = Number.isFinite(Number(device?.ramTotalKb)) ? Number(device.ramTotalKb) : null
                         const hasBattery = Number.isFinite(battery)
                         const modeStr = modeLabel(device?.mode)
 
@@ -192,12 +200,18 @@ export default async function DashboardPage() {
 
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-slate-400">CPU</span>
-                                            <span className="text-sm text-white">{cpu.toFixed(1)}%</span>
+                                            <span className="text-sm text-white">
+                                                {cpu != null ? `${cpu.toFixed(1)}%` : 'N/A'}
+                                            </span>
                                         </div>
 
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-slate-400">RAM</span>
-                                            <span className="text-sm text-white">{Math.round(ram)} MB</span>
+                                            <span className="text-sm text-white">
+                                                {ramUsedKb != null && ramTotalKb != null
+                                                    ? `${formatMemoryFromKb(ramUsedKb)} / ${formatMemoryFromKb(ramTotalKb)}`
+                                                    : 'N/A'}
+                                            </span>
                                         </div>
                                     </div>
                                 ) : (

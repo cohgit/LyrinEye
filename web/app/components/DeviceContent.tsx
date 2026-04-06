@@ -14,6 +14,11 @@ interface DeviceContentProps {
 
 export default function DeviceContent({ deviceId, device, userEmail }: DeviceContentProps) {
     const [activeTab, setActiveTab] = useState<'charts' | 'history'>('charts')
+    const formatMemoryFromKb = (kb?: number): string => {
+        if (typeof kb !== 'number' || !Number.isFinite(kb) || kb < 0) return 'N/A'
+        if (kb >= 1024 * 1024) return `${(kb / 1024 / 1024).toFixed(2)} GB`
+        return `${(kb / 1024).toFixed(0)} MB`
+    }
 
     // Determine status for metrics availability
     const lastSeenDate = new Date(device.lastSeen);
@@ -67,14 +72,17 @@ export default function DeviceContent({ deviceId, device, userEmail }: DeviceCon
 
                             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
                                 <h3 className="text-xs text-slate-400 mb-2">CPU</h3>
-                                <div className="text-2xl font-bold text-white">{device.cpu?.toFixed(1)}%</div>
+                                <div className="text-2xl font-bold text-white">
+                                    {typeof device.cpu === 'number' && Number.isFinite(device.cpu) ? `${device.cpu.toFixed(1)}%` : 'N/A'}
+                                </div>
                             </div>
 
                             <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl p-4">
                                 <h3 className="text-xs text-slate-400 mb-2">RAM</h3>
                                 <div className="text-lg font-bold text-white">
-                                    {device.ramUsed ? `${(device.ramUsed / 1024).toFixed(1)}GB / ` : ''}
-                                    {(device.ram / 1024).toFixed(1)} GB
+                                    {typeof device.ramUsedKb === 'number' && typeof device.ramTotalKb === 'number'
+                                        ? `${formatMemoryFromKb(device.ramUsedKb)} / ${formatMemoryFromKb(device.ramTotalKb)}`
+                                        : 'N/A'}
                                 </div>
                             </div>
 

@@ -54,6 +54,8 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                     ...row,
                     cpu: toNumberOrNull(row?.cpu),
                     ram: toNumberOrNull(row?.ram),
+                    ramUsedMB: toNumberOrNull(row?.ramUsedMB),
+                    ramTotalMB: toNumberOrNull(row?.ramTotalMB),
                     battery: toNumberOrNull(row?.battery),
                     diskFree: toNumberOrNull(row?.diskFree),
                     batteryTempC: toNumberOrNull(row?.batteryTempC),
@@ -156,14 +158,14 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                         </div>
                     </div>
 
-                    {/* RAM */}
+                    {/* RAM (MB) */}
                     <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 backdrop-blur-sm">
                         <h3 className="text-sm font-medium text-slate-300 mb-6 flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                            RAM
+                            RAM Usada (MB)
                         </h3>
                         <div className="h-56">
-                            {hasAnyValue(data, "ram") ? (
+                            {hasAnyValue(data, "ramUsedMB") ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={data}>
                                         <defs>
@@ -174,9 +176,9 @@ export default function DeviceCharts({ deviceId }: DeviceChartsProps) {
                                         </defs>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                                         <XAxis dataKey="timestamp" tickFormatter={formatDate} stroke="#64748b" tick={{ fontSize: 10 }} tickMargin={10} />
-                                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[0, 100]} unit="%" />
+                                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} unit=" MB" />
                                         <Tooltip content={<CustomTooltip />} />
-                                        <Area type="monotone" dataKey="ram" name="RAM" stroke="#34d399" fillOpacity={1} fill="url(#colorRam)" unit="%" strokeWidth={2} />
+                                        <Area type="monotone" dataKey="ramUsedMB" name="RAM usada" stroke="#34d399" fillOpacity={1} fill="url(#colorRam)" unit=" MB" strokeWidth={2} />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             ) : (

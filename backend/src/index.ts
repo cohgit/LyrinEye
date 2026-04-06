@@ -452,6 +452,11 @@ app.get('/api/devices', async (req, res) => {
             if (!obj) return null;
             return obj[baseKey] ?? obj[`${baseKey}_s`] ?? obj[`${baseKey}_d`] ?? obj[`${baseKey}_b`] ?? obj[`${baseKey}_g`];
         };
+        const toNumberOrNull = (value: unknown): number | null => {
+            if (value === null || value === undefined || value === '') return null;
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
 
         const devices = deviceEntities.map(entity => {
             const deviceId = entity.rowKey as string;
@@ -468,14 +473,23 @@ app.get('/api/devices', async (req, res) => {
             const deviceName = getVal(telemetry, 'DeviceName');
             const appVer = getVal(telemetry, 'AppVersion');
             const androidVer = getVal(telemetry, 'AndroidVersion');
+            const cpuValue = toNumberOrNull((entity.cpu as number) ?? getVal(telemetry, 'CPUUsage'));
+            const memTotalKb = toNumberOrNull(getVal(telemetry, 'MemTotalKB'));
+            const memAvailableKb = toNumberOrNull(getVal(telemetry, 'MemAvailableKB'));
+            const ramUsedFromMeminfoKb = (memTotalKb != null && memAvailableKb != null) ? Math.max(0, memTotalKb - memAvailableKb) : null;
+            const ramUsedMb = toNumberOrNull(getVal(telemetry, 'RamUsedMB'));
+            const ramTotalMb = toNumberOrNull(getVal(telemetry, 'RamTotalMB'));
+            const ramUsedKb = ramUsedFromMeminfoKb ?? (ramUsedMb != null ? Math.round(ramUsedMb * 1024) : null);
+            const ramTotalKb = memTotalKb ?? (ramTotalMb != null ? Math.round(ramTotalMb * 1024) : null);
 
             return {
                 id: deviceId,
                 name: deviceName || entity.name || deviceId.substring(0, 8),
                 status: 'online',
-                battery: (entity.battery as number) || getVal(telemetry, 'BatteryLevel') || null,
-                cpu: (entity.cpu as number) || getVal(telemetry, 'CPUUsage') || null,
-                ram: (entity.ram as number) || getVal(telemetry, 'RamTotalMB') || null,
+                battery: toNumberOrNull((entity.battery as number) ?? getVal(telemetry, 'BatteryLevel')),
+                cpu: cpuValue,
+                ramUsedKb: ramUsedKb,
+                ramTotalKb: ramTotalKb,
                 lastSeen: isTransmitting || isRecording ? new Date().toISOString() : (entity.registeredAt || new Date().toISOString()),
                 isCharging: getVal(telemetry, 'IsCharging') === true || getVal(telemetry, 'IsCharging') === "true",
                 isTransmitting: isTransmitting,
@@ -518,9 +532,20 @@ app.get('/api/devices/:id', async (req, res) => {
             if (!obj) return null;
             return obj[baseKey] ?? obj[`${baseKey}_s`] ?? obj[`${baseKey}_d`] ?? obj[`${baseKey}_b`] ?? obj[`${baseKey}_g`];
         };
+        const toNumberOrNull = (value: unknown): number | null => {
+            if (value === null || value === undefined || value === '') return null;
+            const parsed = Number(value);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
 
         const cpu = getVal(telemetry, 'CPUUsage');
-        const ram = getVal(telemetry, 'RamTotalMB');
+        const memTotalKbRaw = getVal(telemetry, 'MemTotalKB');
+        const memFreeKbRaw = getVal(telemetry, 'MemFreeKB');
+        const memAvailableKbRaw = getVal(telemetry, 'MemAvailableKB');
+        const buffersKbRaw = getVal(telemetry, 'BuffersKB');
+        const cachedKbRaw = getVal(telemetry, 'CachedKB');
+        const ramMb = getVal(telemetry, 'RamTotalMB');
+        const ramUsedMb = getVal(telemetry, 'RamUsedMB');
         const appVer = getVal(telemetry, 'AppVersion');
         const androidVer = getVal(telemetry, 'AndroidVersion');
         const wifi = getVal(telemetry, 'WifiSSID');
@@ -532,7 +557,6 @@ app.get('/api/devices/:id', async (req, res) => {
         const deviceName = getVal(telemetry, 'DeviceName');
         const mode = getVal(telemetry, 'Mode');
         const storageFree = getVal(telemetry, 'StorageFreeMB');
-        const ramUsed = getVal(telemetry, 'RamUsedMB');
         const batteryStatus = getVal(telemetry, 'BatteryStatus');
         const lowPowerMode = getVal(telemetry, 'LowPowerMode');
         const batteryTemp = getVal(telemetry, 'BatteryTempC');
@@ -541,6 +565,9 @@ app.get('/api/devices/:id', async (req, res) => {
         const thermalHeadroom = getVal(telemetry, 'ThermalHeadroom');
         const lat = getVal(telemetry, 'Latitude');
         const lon = getVal(telemetry, 'Longitude');
+        const memTotalKb = toNumberOrNull(memTotalKbRaw);
+        const memAvailableKb = toNumberOrNull(memAvailableKbRaw);
+        const memUsedKb = (memTotalKb != null && memAvailableKb != null) ? Math.max(0, memTotalKb - memAvailableKb) : null;
 
         console.log(`[DEVICES] Found telemetry for ${deviceId}: ${telemetry ? 'YES' : 'NO'}`);
 
@@ -551,10 +578,15 @@ app.get('/api/devices/:id', async (req, res) => {
             lastSeen: isTransmitting || streaming ? new Date().toISOString() : ((deviceEntity as any)?.registeredAt || new Date().toISOString()),
             isTransmitting: isTransmitting || streaming === true || streaming === "true",
             isRecording: false, // Will be calculated below
-            battery: battery ? parseFloat(battery) : null,
+            battery: toNumberOrNull(battery),
             isCharging: isCharging === true || isCharging === "true",
-            cpu: cpu ? parseFloat(cpu) : null,
-            ram: ram ? parseFloat(ram) : null,
+            cpu: toNumberOrNull(cpu),
+            ramTotalKb: memTotalKb ?? (toNumberOrNull(ramMb) != null ? Math.round(Number(ramMb) * 1024) : undefined),
+            ramUsedKb: memUsedKb ?? (toNumberOrNull(ramUsedMb) != null ? Math.round(Number(ramUsedMb) * 1024) : undefined),
+            memFreeKb: toNumberOrNull(memFreeKbRaw) ?? undefined,
+            memAvailableKb: toNumberOrNull(memAvailableKbRaw) ?? undefined,
+            buffersKb: toNumberOrNull(buffersKbRaw) ?? undefined,
+            cachedKb: toNumberOrNull(cachedKbRaw) ?? undefined,
             androidVersion: androidVer || (deviceEntity as any)?.androidVersion || '?',
             appVersion: appVer || (deviceEntity as any)?.appVersion || '?',
             wifiSSID: wifi || (deviceEntity as any)?.wifiSSID || null,
@@ -562,11 +594,10 @@ app.get('/api/devices/:id', async (req, res) => {
             streaming: streaming === true || streaming === "true",
             connectionStart: isConn === true || isConn === "true",
             mode: mode || 'unknown',
-            storageFree: storageFree ? parseFloat(storageFree) : undefined,
-            ramUsed: ramUsed ? parseFloat(ramUsed) : undefined,
+            storageFree: toNumberOrNull(storageFree) ?? undefined,
             batteryStatus: batteryStatus || undefined,
             lowPowerMode: lowPowerMode === 'Yes' || lowPowerMode === true || lowPowerMode === "true",
-            batteryTempC: batteryTemp ? parseFloat(batteryTemp) : undefined,
+            batteryTempC: toNumberOrNull(batteryTemp) ?? undefined,
             thermalStatus: thermalStatus || undefined,
             thermalStatusCode: thermalCode != null ? Number(thermalCode) : undefined,
             thermalHeadroom: thermalHeadroom != null ? Number(thermalHeadroom) : undefined,

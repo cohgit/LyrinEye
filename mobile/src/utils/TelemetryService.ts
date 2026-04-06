@@ -21,6 +21,14 @@ const deviceHealth = (NativeModules as any).DeviceHealthModule as {
     getHealthSnapshot?: () => Promise<Partial<ThermalInfo>>;
 } | undefined;
 
+type MemInfoKpis = {
+    memTotalKb: number;
+    memFreeKb: number;
+    memAvailableKb: number;
+    buffersKb: number;
+    cachedKb: number;
+};
+
 class TelemetryService {
     private intervalId: ReturnType<typeof setInterval> | null = null;
     private readonly INTERVAL_MS = 60000; // 60 seconds
@@ -64,10 +72,9 @@ class TelemetryService {
 
     private async collectAndSend() {
         try {
-            const freeDisk = await RNFS.getFSInfo().then(info => info.freeSpace).catch(() => -1);
-            const totalMemory = await DeviceInfo.getTotalMemory();
-            const usedMemory = await DeviceInfo.getUsedMemory();
+            const freeDiskBytes = await RNFS.getFSInfo().then(info => info.freeSpace).catch(() => -1);
             const thermal = await this.getThermalInfo();
+            const memInfo = await this.getMemInfoKpis();
 
             // CPU usage: prefer Android native snapshot (more reliable), fallback to proc/stat.
             const cpuUsage = await this.getCpuUsage(thermal);
@@ -79,12 +86,34 @@ class TelemetryService {
             // Geolocation
             const coords = await this.getCoordinates();
 
+            // If core KPIs are incomplete, do not emit telemetry.
+            if (
+                !memInfo ||
+                cpuUsage == null ||
+                !Number.isFinite(batteryLevel) ||
+                freeDiskBytes < 0
+            ) {
+                console.warn('[TELEMETRY] Skipping send due to incomplete KPI snapshot', {
+                    hasMemInfo: !!memInfo,
+                    cpuUsage,
+                    batteryLevel,
+                    freeDiskBytes
+                });
+                return;
+            }
+
+            const ramUsedKb = Math.max(0, memInfo.memTotalKb - memInfo.memAvailableKb);
             const telemetryData = {
-                BatteryLevel: batteryLevel.toFixed(4),
-                StorageFreeMB: (freeDisk / 1024 / 1024).toFixed(2),
-                RamUsedMB: (usedMemory / 1024 / 1024).toFixed(2),
-                RamTotalMB: (totalMemory / 1024 / 1024).toFixed(2),
-                CPUUsage: cpuUsage,
+                BatteryLevel: Number(batteryLevel.toFixed(4)),
+                StorageFreeMB: Number((freeDiskBytes / 1024 / 1024).toFixed(2)),
+                RamUsedMB: Number((ramUsedKb / 1024).toFixed(2)),
+                RamTotalMB: Number((memInfo.memTotalKb / 1024).toFixed(2)),
+                CPUUsage: Number(cpuUsage.toFixed(2)),
+                MemTotalKB: memInfo.memTotalKb,
+                MemFreeKB: memInfo.memFreeKb,
+                MemAvailableKB: memInfo.memAvailableKb,
+                BuffersKB: memInfo.buffersKb,
+                CachedKB: memInfo.cachedKb,
                 IsCharging: powerState.batteryState === 'charging' || powerState.batteryState === 'full',
                 BatteryStatus: powerState.batteryState || 'unknown',
                 LowPowerMode: powerState.lowPowerMode ? 'Yes' : 'No',
@@ -149,14 +178,14 @@ class TelemetryService {
         }
     }
 
-    private async getCpuUsage(thermal: ThermalInfo): Promise<string> {
+    private async getCpuUsage(thermal: ThermalInfo): Promise<number | null> {
         if (typeof thermal.cpuUsagePercent === 'number' && Number.isFinite(thermal.cpuUsagePercent)) {
-            return thermal.cpuUsagePercent.toFixed(2);
+            return Math.max(0, Math.min(100, thermal.cpuUsagePercent));
         }
         return this.getCPUUsage();
     }
 
-    private async getCPUUsage(): Promise<string> {
+    private async getCPUUsage(): Promise<number | null> {
         try {
             // proc/stat is standard on Android for CPU metrics
             const readStat = async () => {
@@ -176,14 +205,57 @@ class TelemetryService {
             const idleDelta = end.idle - start.idle;
             const totalDelta = end.total - start.total;
 
-            if (totalDelta === 0) return '0.00';
+            if (totalDelta === 0) return 0;
 
             const usage = 100 * (1 - idleDelta / totalDelta);
-            return usage.toFixed(2);
+            return Number.isFinite(usage) ? Math.max(0, Math.min(100, usage)) : null;
 
         } catch (error) {
-            // Fail silently to 'N/A' on non-Android or restricted systems
-            return 'N/A';
+            return null;
+        }
+    }
+
+    private async getMemInfoKpis(): Promise<MemInfoKpis | null> {
+        try {
+            const meminfo = await RNFS.readFile('/proc/meminfo', 'utf8');
+            const lines = meminfo.split('\n');
+            const values: Record<string, number> = {};
+
+            for (const line of lines) {
+                const match = line.match(/^([A-Za-z_()]+):\s+(\d+)\s+kB$/);
+                if (!match) continue;
+                const [, key, raw] = match;
+                const parsed = Number(raw);
+                if (Number.isFinite(parsed)) {
+                    values[key] = parsed;
+                }
+            }
+
+            const memTotalKb = values.MemTotal;
+            const memFreeKb = values.MemFree;
+            const memAvailableKb = values.MemAvailable;
+            const buffersKb = values.Buffers;
+            const cachedKb = values.Cached;
+
+            if (
+                !Number.isFinite(memTotalKb) ||
+                !Number.isFinite(memFreeKb) ||
+                !Number.isFinite(memAvailableKb) ||
+                !Number.isFinite(buffersKb) ||
+                !Number.isFinite(cachedKb)
+            ) {
+                return null;
+            }
+
+            return {
+                memTotalKb,
+                memFreeKb,
+                memAvailableKb,
+                buffersKb,
+                cachedKb
+            };
+        } catch {
+            return null;
         }
     }
 }
