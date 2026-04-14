@@ -42,7 +42,7 @@ export class Recorder {
         this.transport = await this.router.createPlainTransport({
             listenIp: config.mediasoup.plainTransport.listenIp,
             rtcpMux: false,
-            comedia: false // We define the port
+            comedia: config.mediasoup.plainTransport.comedia
         });
 
         // 2. Consume the stream
@@ -51,27 +51,17 @@ export class Recorder {
         this.consumer = await this.transport.consume({
             producerId: this.producerId,
             rtpCapabilities: {
-                codecs: rtpCapabilities // Simplification: assume default capabilities work
+                codecs: rtpCapabilities
             },
             paused: true
         });
 
-        // 3. Connect transport (needs remote port, but for plain transport FFmpeg binds to local)
-        // In PlainTransport, we get `tuple.localPort` where mediasoup listens.
-        // FFmpeg should SEND to this port? No, Mediasoup SENDS to FFmpeg.
-        // So we need to tell Mediasoup WHERE FFmpeg is listening.
-
-        // Actually, simple flow:
-        // Mediasoup (PlainTransport) -> send RTP -> FFmpeg (UDP input)
-
-        // We need to pick a port for FFmpeg to listen on.
         const remotePort = await this.getPort();
         const remoteIp = '127.0.0.1';
 
         await this.transport.connect({
             ip: remoteIp,
             port: remotePort,
-            // RTCP port usually +1
             rtcpPort: remotePort + 1
         });
 
@@ -103,14 +93,12 @@ export class Recorder {
         await this.stopCurrentSegment();
     }
 
-    // Helper to find a free UDP port (simplified)
-    // In production use a port manager
     private async getPort(): Promise<number> {
         return Math.floor(Math.random() * (20000 - 15000) + 15000);
     }
 
     private async startFFmpeg(rtpPort: number) {
-        const recordingDir = config.recording.outputDir; // e.g. /tmp/recordings
+        const recordingDir = config.recording.outputDir;
         if (!fs.existsSync(recordingDir)) {
             fs.mkdirSync(recordingDir, { recursive: true });
         }
@@ -143,8 +131,8 @@ export class Recorder {
         const args = [
             '-protocol_whitelist', 'file,udp,rtp',
             '-thread_queue_size', '1024',
-            '-analyzeduration', '20000000', // 20s analyze window
-            '-probesize', '20000000',       // 20MB probe buffer
+            '-analyzeduration', '20000000',
+            '-probesize', '20000000',
             '-f', 'sdp',
             '-i', this.currentSdpPath
         ];
@@ -158,7 +146,7 @@ export class Recorder {
             args.push('-tune', 'zerolatency');
         }
 
-        args.push('-movflags', 'faststart', '-y', filepath);
+        args.push('-y', filepath);
 
         console.log(`🎬 Spawning FFmpeg segment: ffmpeg ${args.join(' ')}`);
         this.segmentStartedAt = Date.now();
@@ -214,11 +202,7 @@ export class Recorder {
 
     private createSdp(port: number): string {
         const codec = this.consumer.rtpParameters.codecs[0];
-        const codecName = codec.mimeType.split('/')[1].toUpperCase();
         const isAudio = this.isAudio;
-
-        // VP8 requires explicit video size in SDP for FFmpeg to accept the stream
-        const videoSizeLine = !isAudio ? 'a=framesize:101 640-480\n' : '';
 
         return `v=0
 o=- 0 0 IN IP4 127.0.0.1
@@ -227,15 +211,8 @@ c=IN IP4 127.0.0.1
 t=0 0
 m=${isAudio ? 'audio' : 'video'} ${port} RTP/AVP ${codec.payloadType}
 a=rtpmap:${codec.payloadType} ${codec.mimeType.split('/')[1]}/${codec.clockRate}${isAudio ? '/' + codec.channels : ''}
-${videoSizeLine}${codec.parameters ? this.fmtpString(codec.payloadType, codec.parameters) : ''}
+a=fmtp:${codec.payloadType} profile-id=0;header-negotiation=1
 `;
-    }
-
-    private fmtpString(payloadType: number, params: any): string {
-        const paramStr = Object.keys(params)
-            .map(key => `${key}=${params[key]}`)
-            .join(';');
-        return `a=fmtp:${payloadType} ${paramStr}`;
     }
 
     private async uploadToAzure(filepath: string, blobName: string): Promise<boolean> {

@@ -74,11 +74,11 @@ export const config = {
         // Plain RTP transport (for recording)
         plainTransport: {
             listenIp: {
-                ip: '0.0.0.0',
+                ip: '127.0.0.1',       // Strictly internal for FFmpeg
                 announcedIp: '127.0.0.1',
             },
             rtcpMux: false,
-            comedia: false,  // Mediasoup actively sends to FFmpeg — no handshake needed
+            comedia: false,
         },
     },
 
@@ -90,7 +90,7 @@ export const config = {
         thumbnailTimestamp: '00:00:03',
         videoCodec: 'libx264',
         audioCodec: 'aac',
-        format: 'mp4',
+        format: 'mkv', // Use Matroska for recording stability
     },
 
     // Azure Storage
