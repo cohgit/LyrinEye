@@ -452,7 +452,20 @@ app.get('/api/devices', async (req, res) => {
         const deviceEntities = await listUserDeviceEntitiesMerged(normalizedEmail);
         const deviceIds = deviceEntities.map(e => e.rowKey as string);
 
-        const telemetries = await LogcatService.getLatestTelemetries(deviceIds);
+        let telemetries = new Map<string, any>();
+        try {
+            // Short-circuit if no devices
+            if (deviceIds.length > 0) {
+                // Wrap in a promise with timeout to prevent hanging the dashboard
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Telemetry timeout')), 2000));
+                telemetries = await Promise.race([
+                    LogcatService.getLatestTelemetries(deviceIds),
+                    timeoutPromise
+                ]) as Map<string, any>;
+            }
+        } catch (e) {
+            console.warn(`[DEVICES] Telemetry fetch failed or timed out, proceeding with device list only:`, (e as any).message);
+        }
 
         // Helper to get value regardless of Azure suffix (_s, _d, _b)
         const getVal = (obj: any, baseKey: string) => {
