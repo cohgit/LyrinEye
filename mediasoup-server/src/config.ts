@@ -63,7 +63,7 @@ export const config = {
         webRtcTransport: {
             listenIps: [
                 {
-                    ip: '10.0.1.4',
+                    ip: '0.0.0.0',
                     announcedIp: '104.211.28.4',
                 },
             ],
