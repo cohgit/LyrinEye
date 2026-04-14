@@ -65,14 +65,6 @@ jobs:
       working-directory: ./mobile
       run: npm ci
 
-    - name: Patch react-native-video (PictureInPicture fix)
-      working-directory: ./mobile
-      run: |
-        # Override the problematic Kotlin file with a dummy Java class to bypass AndroidX interface errors
-        mkdir -p node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer
-        echo "package com.brentvatne.exoplayer; public class PictureInPictureUtil { public static void addOnUserLeaveHintListener(Object c, Runnable r) {} public static void removeOnUserLeaveHintListener(Object c) {} }" > node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/PictureInPictureUtil.java
-        rm -f node_modules/react-native-video/android/src/main/java/com/brentvatne/exoplayer/PictureInPictureUtil.kt
-
     - name: Build Android Release
       run: ./gradlew assembleRelease -PversionName=${{ steps.version.outputs.new_version }} -PversionCode=${{ github.run_number }}
 
