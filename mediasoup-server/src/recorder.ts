@@ -145,9 +145,12 @@ export class Recorder {
             '-analyzeduration', '10000000',
             '-probesize',       '10000000',
             '-i', this.currentSdpPath,
-            '-map', '0:v:0',               // take first video stream
-            '-c:v', 'copy',                // VP8 passthrough — no re-encode
-            '-fflags', '+genpts',          // generate missing PTS for WebM
+            '-c:v', 'libvpx',              // transcode VP8 — lets FFmpeg detect resolution
+            '-b:v', '800k',                // target bitrate
+            '-crf', '10',                  // quality
+            '-c:a', 'libopus',             // Opus audio
+            '-b:a', '128k',
+            '-f', 'webm',
             '-y',
             filepath
         ];
