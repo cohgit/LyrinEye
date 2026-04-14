@@ -143,17 +143,23 @@ export class Recorder {
         const args = [
             '-protocol_whitelist', 'file,udp,rtp',
             '-analyzeduration', '10000000',
-            '-probesize', '10000000',
-            '-i', this.currentSdpPath,
-            '-c:v', config.recording.videoCodec, // libx264
-            '-preset', 'veryfast',
-            '-tune', 'zerolatency',
-            '-c:a', config.recording.audioCodec, // aac
-            '-b:a', '128k',
-            '-movflags', 'faststart',             // critical for web playback
-            '-y',
-            filepath
+            '-probesize', '10000000'
         ];
+
+        if (this.isAudio) {
+            args.push('-i', this.currentSdpPath);
+            args.push('-c:a', config.recording.audioCodec);
+            args.push('-b:a', '128k');
+        } else {
+            // For video, specify size to avoid 'unspecified size' errors with VP8
+            args.push('-video_size', '640x480');
+            args.push('-i', this.currentSdpPath);
+            args.push('-c:v', config.recording.videoCodec);
+            args.push('-preset', 'veryfast');
+            args.push('-tune', 'zerolatency');
+        }
+
+        args.push('-movflags', 'faststart', '-y', filepath);
 
         console.log(`🎬 Spawning FFmpeg segment: ffmpeg ${args.join(' ')}`);
         this.segmentStartedAt = Date.now();
