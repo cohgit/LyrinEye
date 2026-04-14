@@ -147,13 +147,12 @@ export class Recorder {
         ];
 
         if (this.isAudio) {
-            args.push('-i', this.currentSdpPath);
+            args.push('-f', 'sdp', '-i', this.currentSdpPath);
             args.push('-c:a', config.recording.audioCodec);
             args.push('-b:a', '128k');
         } else {
-            // For video, specify size to avoid 'unspecified size' errors with VP8
-            args.push('-video_size', '640x480');
-            args.push('-i', this.currentSdpPath);
+            // Use -s for size instead of -video_size which is unsupported for SDP demuxer
+            args.push('-f', 'sdp', '-s', '640x480', '-i', this.currentSdpPath);
             args.push('-c:v', config.recording.videoCodec);
             args.push('-preset', 'veryfast');
             args.push('-tune', 'zerolatency');
