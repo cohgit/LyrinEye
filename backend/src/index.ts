@@ -103,7 +103,21 @@ const rooms = new Map<string, { monitor?: string, viewers: string[] }>();
 io.on('connection', (socket: Socket) => {
     console.log(`User connected: ${socket.id}`);
 
-    socket.on('join-room', async (roomId: string, role: 'monitor' | 'viewer', email?: string) => {
+    socket.on('join-room', async (arg1: any, arg2?: any, arg3?: any) => {
+        let roomId: string;
+        let role: 'monitor' | 'viewer';
+        let email: string | undefined;
+
+        if (typeof arg1 === 'object' && arg1 !== null) {
+            roomId = arg1.roomId;
+            role = arg1.role;
+            email = arg2; // email would be the second arg if first is object
+        } else {
+            roomId = arg1;
+            role = arg2;
+            email = arg3;
+        }
+
         if (role === 'viewer') {
             if (!email) return socket.emit('error', 'Authentication required');
 

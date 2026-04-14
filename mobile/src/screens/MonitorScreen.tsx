@@ -300,7 +300,7 @@ const MonitorScreen = ({ navigation, route }: any) => {
         });
 
         DeviceInfo.getUniqueId().then(id => {
-            socketRef.current?.emit('join-room', id, 'monitor');
+            socketRef.current?.emit('join-room', { roomId: id, role: 'monitor' });
         });
     };
 
