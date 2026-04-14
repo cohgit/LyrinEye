@@ -74,8 +74,8 @@ export const config = {
         // Plain RTP transport (for recording)
         plainTransport: {
             listenIp: {
-                ip: '127.0.0.1',       // Strictly internal for FFmpeg
-                announcedIp: '127.0.0.1',
+                ip: '10.0.1.4',       // Private IP of the VM
+                announcedIp: '10.0.1.4',
             },
             rtcpMux: false,
             comedia: false,

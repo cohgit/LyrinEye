@@ -57,7 +57,7 @@ export class Recorder {
         });
 
         const remotePort = await this.getPort();
-        const remoteIp = '127.0.0.1';
+        const remoteIp = '10.0.1.4';
 
         await this.transport.connect({
             ip: remoteIp,
@@ -103,6 +103,7 @@ export class Recorder {
             fs.mkdirSync(recordingDir, { recursive: true });
         }
         const sdpContent = this.createSdp(rtpPort);
+        console.log('📄 Generated SDP:\n', sdpContent);
         const sdpPath = path.join(recordingDir, `${this.producerId}-${Date.now()}.sdp`);
         fs.writeFileSync(sdpPath, sdpContent);
         this.currentSdpPath = sdpPath;
