@@ -142,6 +142,7 @@ export class Recorder {
 
         const args = [
             '-protocol_whitelist', 'file,udp,rtp',
+            '-timeout', '10000000',          // 10s wait for RTP stream (microseconds)
             '-i', this.currentSdpPath,
             '-c:v', 'copy',
             '-c:a', 'copy',
@@ -153,8 +154,9 @@ export class Recorder {
         this.segmentStartedAt = Date.now();
         this.process = spawn('ffmpeg', args);
 
-        this.process.stderr?.on('data', () => {
-            // FFmpeg logs to stderr; omit noisy logs by default.
+        this.process.stderr?.on('data', (data) => {
+            const msg = data.toString().trim();
+            if (msg) console.log(`[FFmpeg] ${msg.slice(0, 200)}`);
         });
 
         this.process.on('close', async (code) => {
@@ -183,7 +185,8 @@ export class Recorder {
         try {
             if (!fs.existsSync(filepath)) return;
             const ageMs = this.segmentStartedAt ? Date.now() - this.segmentStartedAt : 0;
-            if (ageMs < 2000) {
+            if (ageMs < 500) {
+                console.warn(`⚠️ Segment too short (${ageMs}ms), discarding.`);
                 fs.unlinkSync(filepath);
                 return;
             }
