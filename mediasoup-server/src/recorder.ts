@@ -142,11 +142,10 @@ export class Recorder {
 
         const args = [
             '-protocol_whitelist', 'file,udp,rtp',
-            '-analyzeduration', '10000000',  // 10s to analyze incoming stream
-            '-probesize', '10000000',        // probe buffer size
             '-i', this.currentSdpPath,
-            '-c:v', 'copy',
-            '-c:a', 'copy',
+            '-c:v', 'copy',        // VP8 passthrough
+            '-c:a', 'libopus',     // encode audio as Opus for WebM
+            '-b:a', '128k',
             '-y',
             filepath
         ];
@@ -205,15 +204,20 @@ export class Recorder {
 
     private createSdp(port: number): string {
         const codec = this.consumer.rtpParameters.codecs[0];
+        const codecName = codec.mimeType.split('/')[1].toUpperCase();
+        const isAudio = this.isAudio;
+
+        // VP8 requires explicit video size in SDP for FFmpeg to accept the stream
+        const videoSizeLine = !isAudio ? 'a=framesize:101 640-480\n' : '';
 
         return `v=0
 o=- 0 0 IN IP4 127.0.0.1
 s=Mediasoup Recorder
 c=IN IP4 127.0.0.1
 t=0 0
-m=${this.isAudio ? 'audio' : 'video'} ${port} RTP/AVP ${codec.payloadType}
-a=rtpmap:${codec.payloadType} ${codec.mimeType.split('/')[1]}/${codec.clockRate}${this.isAudio ? '/' + codec.channels : ''}
-${codec.parameters ? this.fmtpString(codec.payloadType, codec.parameters) : ''}
+m=${isAudio ? 'audio' : 'video'} ${port} RTP/AVP ${codec.payloadType}
+a=rtpmap:${codec.payloadType} ${codec.mimeType.split('/')[1]}/${codec.clockRate}${isAudio ? '/' + codec.channels : ''}
+${videoSizeLine}${codec.parameters ? this.fmtpString(codec.payloadType, codec.parameters) : ''}
 `;
     }
 

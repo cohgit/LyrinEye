@@ -88,9 +88,9 @@ export const config = {
         outputDir: '/tmp/recordings',
         thumbnailDir: '/tmp/recordings/thumbnails',
         thumbnailTimestamp: '00:00:03', // capture representative frame at 3s
-        videoCodec: 'libx264',
-        audioCodec: 'aac',
-        format: 'mp4',
+        videoCodec: 'vp8',
+        audioCodec: 'libopus',
+        format: 'webm',
     },
 
     // Azure Storage
