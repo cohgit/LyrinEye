@@ -142,19 +142,19 @@ export class Recorder {
 
         const args = [
             '-protocol_whitelist', 'file,udp,rtp',
-            '-analyzeduration', '10000000',
-            '-probesize', '10000000'
+            '-thread_queue_size', '1024',
+            '-analyzeduration', '20000000', // 20s analyze window
+            '-probesize', '20000000',       // 20MB probe buffer
+            '-f', 'sdp',
+            '-i', this.currentSdpPath
         ];
 
         if (this.isAudio) {
-            args.push('-f', 'sdp', '-i', this.currentSdpPath);
             args.push('-c:a', config.recording.audioCodec);
             args.push('-b:a', '128k');
         } else {
-            // Use -s for size instead of -video_size which is unsupported for SDP demuxer
-            args.push('-f', 'sdp', '-s', '640x480', '-i', this.currentSdpPath);
             args.push('-c:v', config.recording.videoCodec);
-            args.push('-preset', 'veryfast');
+            args.push('-preset', 'ultrafast');
             args.push('-tune', 'zerolatency');
         }
 
