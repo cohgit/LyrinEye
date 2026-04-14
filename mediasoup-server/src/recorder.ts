@@ -143,14 +143,14 @@ export class Recorder {
         const args = [
             '-protocol_whitelist', 'file,udp,rtp',
             '-analyzeduration', '10000000',
-            '-probesize',       '10000000',
+            '-probesize', '10000000',
             '-i', this.currentSdpPath,
-            '-c:v', 'libvpx',              // transcode VP8 — lets FFmpeg detect resolution
-            '-b:v', '800k',                // target bitrate
-            '-crf', '10',                  // quality
-            '-c:a', 'libopus',             // Opus audio
+            '-c:v', config.recording.videoCodec, // libx264
+            '-preset', 'veryfast',
+            '-tune', 'zerolatency',
+            '-c:a', config.recording.audioCodec, // aac
             '-b:a', '128k',
-            '-f', 'webm',
+            '-movflags', 'faststart',             // critical for web playback
             '-y',
             filepath
         ];
@@ -161,7 +161,7 @@ export class Recorder {
 
         this.process.stderr?.on('data', (data) => {
             const msg = data.toString().trim();
-            if (msg) console.log(`[FFmpeg] ${msg.slice(0, 200)}`);
+            if (msg) console.log(`[FFmpeg] ${msg.slice(0, 500)}`);
         });
 
         this.process.on('close', async (code) => {

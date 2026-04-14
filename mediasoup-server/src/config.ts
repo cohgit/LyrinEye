@@ -78,7 +78,7 @@ export const config = {
                 announcedIp: '127.0.0.1',
             },
             rtcpMux: false,
-            comedia: true,
+            comedia: false,  // Mediasoup actively sends to FFmpeg — no handshake needed
         },
     },
 
@@ -87,10 +87,10 @@ export const config = {
         chunkDuration: 60, // seconds
         outputDir: '/tmp/recordings',
         thumbnailDir: '/tmp/recordings/thumbnails',
-        thumbnailTimestamp: '00:00:03', // capture representative frame at 3s
-        videoCodec: 'vp8',
-        audioCodec: 'libopus',
-        format: 'webm',
+        thumbnailTimestamp: '00:00:03',
+        videoCodec: 'libx264',
+        audioCodec: 'aac',
+        format: 'mp4',
     },
 
     // Azure Storage
