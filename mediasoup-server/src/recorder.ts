@@ -142,7 +142,8 @@ export class Recorder {
 
         const args = [
             '-protocol_whitelist', 'file,udp,rtp',
-            '-timeout', '10000000',          // 10s wait for RTP stream (microseconds)
+            '-analyzeduration', '10000000',  // 10s to analyze incoming stream
+            '-probesize', '10000000',        // probe buffer size
             '-i', this.currentSdpPath,
             '-c:v', 'copy',
             '-c:a', 'copy',
