@@ -64,7 +64,7 @@ export const config = {
             listenIps: [
                 {
                     ip: '0.0.0.0',
-                    announcedIp: process.env.ANNOUNCED_IP || undefined,
+                    announcedIp: '104.211.28.4',
                 },
             ],
             maxIncomingBitrate: 1500000,
