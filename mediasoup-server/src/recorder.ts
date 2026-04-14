@@ -142,10 +142,12 @@ export class Recorder {
 
         const args = [
             '-protocol_whitelist', 'file,udp,rtp',
+            '-analyzeduration', '10000000',
+            '-probesize',       '10000000',
             '-i', this.currentSdpPath,
-            '-c:v', 'copy',        // VP8 passthrough
-            '-c:a', 'libopus',     // encode audio as Opus for WebM
-            '-b:a', '128k',
+            '-map', '0:v:0',               // take first video stream
+            '-c:v', 'copy',                // VP8 passthrough — no re-encode
+            '-fflags', '+genpts',          // generate missing PTS for WebM
             '-y',
             filepath
         ];
