@@ -875,6 +875,18 @@ app.post('/api/web/logs', async (req, res) => {
     }
 });
 
+// Versioning for Auto-Update (Phase 10)
+app.get('/version/latest', (req, res) => {
+    // These should ideally come from environment variables or a DB
+    // but for now we define the current production levels here.
+    res.send({
+        version: "0.1.20",
+        buildNumber: 1,
+        url: "https://lyrineyestorage.blob.core.windows.net/apps/LyrinEye-v0.1.20.apk",
+        changelog: "Estabilización de cámara y permisos. Soporte para auto-actualización remota."
+    });
+});
+
 app.get('/health', (req, res) => {
     res.send({ status: 'ok', rooms: rooms.size });
 });

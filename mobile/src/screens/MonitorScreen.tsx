@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, AppState, Modal, TextInput, Dimensions, PermissionsAndroid, Platform, TouchableWithoutFeedback } from 'react-native';
 import { mediaDevices, RTCView } from 'react-native-webrtc';
 import DeviceInfo from 'react-native-device-info';
-import { useMicrophonePermission, Orientation } from 'react-native-vision-camera';
+import { useMicrophonePermission, useCameraPermission, Orientation } from 'react-native-vision-camera';
 import { io, Socket } from 'socket.io-client';
 import { CONFIG } from '../config';
 import { AzureLogger } from '../utils/AzureLogger';
@@ -41,12 +41,18 @@ const MonitorScreen = ({ navigation, route }: any) => {
     const lastAdbCommandId = useRef<string | null>(null);
 
     const { hasPermission: hasMicPermission, requestPermission: requestMicPermission } = useMicrophonePermission();
+    const { hasPermission: hasCameraPermission, requestPermission: requestCameraPermission } = useCameraPermission();
 
     useEffect(() => {
         (async () => {
             if (!hasMicPermission) {
                 const status = await requestMicPermission();
                 if (!status) Alert.alert("Permission required", "Microphone permission is needed for streaming.");
+            }
+
+            if (!hasCameraPermission) {
+                const status = await requestCameraPermission();
+                if (!status) Alert.alert("Permission required", "Camera permission is needed for streaming.");
             }
 
             if (Platform.OS === 'android') {

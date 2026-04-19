@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.apk
+artifacts/
+*.png
+*.jpg
+*.xml
+*.txt
+*.log
+register_s8.json

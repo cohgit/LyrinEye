@@ -54,7 +54,7 @@ export class MediasoupViewer {
                 if (response.error) return reject(response.error);
 
                 try {
-                    const { rtpCapabilities } = response;
+                    const { rtpCapabilities, producers } = response;
 
                     if (!this.device!.loaded) {
                         await this.device!.load({ routerRtpCapabilities: rtpCapabilities });
@@ -62,6 +62,15 @@ export class MediasoupViewer {
 
                     // Create Transport
                     await this.createRecvTransport();
+
+                    // Consume existing producers
+                    if (producers && Array.isArray(producers)) {
+                        for (const p of producers) {
+                            console.log('📹 Consuming existing producer:', p.id);
+                            this.consume(p.id).catch(e => console.error("Failed to consume existing producer", e));
+                        }
+                    }
+
                     resolve();
                 } catch (error) {
                     reject(error);

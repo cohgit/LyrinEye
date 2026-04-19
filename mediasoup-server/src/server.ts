@@ -80,6 +80,10 @@ io.on('connection', (socket) => {
             callback({
                 success: true,
                 rtpCapabilities: room.router.rtpCapabilities,
+                producers: Array.from(room.producers.values()).map(p => ({
+                    id: p.id,
+                    kind: p.kind
+                }))
             });
         } catch (error: any) {
             console.error('❌ join-room error:', error);
